@@ -145,23 +145,27 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 | system.storage.md.activity.completion.time           |    md array    |                                completion                                |        seconds        |
 | system.storage.md.activity.io.rate                   |    md array    |                                 activity                                 |        bytes/s        |
 | system.storage.md.nonredundant.state                 |    md array    |                          available, unavailable                          |         state         |
-| system.storage.fs.zfspool.state                      |      pool      |           online, degraded, faulted, offline, removed, unavail           |        boolean        |
-| zfs.reads                                            |     global     |                     arc, demand, prefetch, metadata                      |        reads/s        |
-| zfs.bytes                                            |     global     |                               read, write                                |         KiB/s         |
-| zfs.hits                                             |     global     |                               hits, misses                               |      percentage       |
-| zfs.dhits                                            |     global     |                               hits, misses                               |      percentage       |
-| zfs.phits                                            |     global     |                               hits, misses                               |      percentage       |
-| zfs.mhits                                            |     global     |                               hits, misses                               |      percentage       |
-| zfs.l2hits                                           |     global     |                               hits, misses                               |      percentage       |
-| zfs.list_hits                                        |     global     |                               hits, misses                               |      percentage       |
-| zfs.arc_size_breakdown                               |     global     |                             recent, frequent                             |      percentage       |
-| zfs.memory_ops                                       |     global     |                       direct, throttled, indirect                        |     operations/s      |
-| zfs.important_ops                                    |     global     |             evict_skip, deleted, mutex_miss, hash_collisions             |     operations/s      |
-| zfs.actual_hits                                      |     global     |                               hits, misses                               |      percentage       |
-| zfs.demand_data_hits                                 |     global     |                               hits, misses                               |      percentage       |
-| zfs.prefetch_data_hits                               |     global     |                               hits, misses                               |      percentage       |
-| zfs.hash_elements                                    |     global     |                               current, max                               |       elements        |
-| zfs.hash_chains                                      |     global     |                               current, max                               |        chains         |
+| system.storage.fs.zfs.pool.state                     |      pool      |           online, degraded, faulted, offline, removed, unavail           |         state         |
+| system.storage.fs.zfs.io.rate                        |     global     |                               read, write                                |        bytes/s        |
+| system.storage.fs.zfs.hits.ratio                     |     global     |                               hits, misses                               |      percentage       |
+| system.storage.fs.zfs.hits.rate                      |     global     |                               hits, misses                               |      percentage       |
+| system.storage.fs.zfs.demand.data.hits.ratio         |     global     |                               hits, misses                               |      percentage       |
+| system.storage.fs.zfs.demand.metadata.hits.rate      |     global     |                               hits, misses                               |       events/s        |
+| system.storage.fs.zfs.prefetch.data.hits.ratio       |     global     |                               hits, misses                               |      percentage       |
+| system.storage.fs.zfs.prefetch.metadata.hits.rate    |     global     |                               hits, misses                               |       events/s        |
+| system.storage.fs.zfs.l2.hits.ratio                  |     global     |                               hits, misses                               |      percentage       |
+| system.storage.fs.zfs.l2.hits.rate                   |     global     |                               hits, misses                               |       events/s        |
+| system.storage.fs.zfs.list.hits.rate                 |     global     |                      mfu, mfu_ghost, mru, mru_ghost                      |        hits/s         |
+| system.storage.fs.zfs.arc_size.ratio                 |     global     |                             recent, frequent                             |      percentage       |
+| system.storage.fs.zfs.memory.operations.rate         |     global     |                       direct, throttled, indirect                        |     operations/s      |
+| system.storage.fs.zfs.eviction.skip.rate             |     global     |                                   skip                                   |        skip/s         |
+| system.storage.fs.zfs.eviction.delete.rate           |     global     |                                  delete                                  |       deletes/s       |
+| system.storage.fs.zfs.eviction.mutex_miss.rate       |     global     |                                   miss                                   |       misses/s        |
+| system.storage.fs.zfs.hash.collisions.rate           |     global     |                                collisions                                |     collisions/s      |
+| system.storage.fs.zfs.hash.elements.max              |     global     |                                   max                                    |       elements        |
+| system.storage.fs.zfs.hash.elements.count            |     global     |                                 current                                  |       elements        |
+| system.storage.fs.zfs.hash.chains.max                |     global     |                                   max                                    |       elements        |
+| system.storage.fs.zfs.hash.chains.count              |     global     |                                 current                                  |       elements        |
 | system.powersupply.capacity.perc                     |  power supply  |                                 capacity                                 |      percentage       |
 | system.powersupply.charge.num                        |  power supply  |                                  charge                                  |          Ah           |
 | system.powersupply.energy.num                        |  power supply  |                                  energy                                  |          Wh           |
