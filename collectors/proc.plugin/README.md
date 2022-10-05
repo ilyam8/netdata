@@ -317,6 +317,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 
 ## Metrics
 
+<details>
+<summary>Metrics</summary>
+
 | Metric                                  |     Scope      |                                                                                                                                           Dimensions                                                                                                                                           |         Units          |
 |-----------------------------------------|:--------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|:----------------------:|
 | system.ipc_semaphores                   |     global     |                                                                                                                                           semaphores                                                                                                                                           |       semaphores       |
@@ -562,6 +565,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 | powersupply.charge                      |    battery     |                                                                                                                          empty_design, empty, now, full, full_design                                                                                                                           |           Ah           |
 | powersupply.energy                      |    battery     |                                                                                                                          empty_design, empty, now, full, full_design                                                                                                                           |           Wh           |
 | powersupply.voltage                     |    battery     |                                                                                                                             min_design, min, now, max, max_design                                                                                                                              |           V            |
+
+</details>
 
 ## Monitoring Disks
 
