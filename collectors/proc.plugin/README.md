@@ -211,12 +211,12 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 | system.storage.device.iops.count.rate                          |       disk       |                                                                                                                                reads, writes, discards, flushes                                                                                                                                |  operations/s  |
 | system.storage.device.iops.duration.time                       |       disk       |                                                                                                                                reads, writes, discards, flushes                                                                                                                                |    seconds     |
 | system.storage.device.iops.queued.count.num                    |       disk       |                                                                                                                                           operations                                                                                                                                           |   operations   |
-| system.storage.device.discards.count.rate                      |       disk       |                                                                                                                                            discards                                                                                                                                            |    bytes/s     |
-| system.storage.device.backlog.duration.time                    |       disk       |                                                                                                                                            backlog                                                                                                                                             |    seconds     |
-| system.storage.device.busy.duration.time                       |       disk       |                                                                                                                                              busy                                                                                                                                              |    seconds     |
 | system.storage.device.iops.completion.duration.time            |       disk       |                                                                                                                                          read, write                                                                                                                                           |    seconds     |
 | system.storage.device.iops.service.duration.time               |       disk       |                                                                                                                                           operation                                                                                                                                            |    seconds     |
 | system.storage.device.iops.size.num                            |       disk       |                                                                                                                                      read, write, discard                                                                                                                                      |     bytes      |
+| system.storage.device.discards.count.rate                      |       disk       |                                                                                                                                            discards                                                                                                                                            |    bytes/s     |
+| system.storage.device.backlog.duration.time                    |       disk       |                                                                                                                                            backlog                                                                                                                                             |    seconds     |
+| system.storage.device.busy.duration.time                       |       disk       |                                                                                                                                              busy                                                                                                                                              |    seconds     |
 | system.storage.device.bcache.allocation.size.perc              |       disk       |                                                                                                                           unused, dirty, clean, metadata, undefined                                                                                                                            |   percentage   |
 | system.storage.device.bcache.hits.count.perc                   |       disk       |                                                                                                                                    5min, 1hour, 1day, ever                                                                                                                                     |   percentage   |
 | system.storage.device.bcache.writeback.io.xfer.rate            |       disk       |                                                                                                                                           writeback                                                                                                                                            |    bytes/s     |
@@ -293,8 +293,32 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 
 ## TODO
 
-| Metric | Scope | Dimensions | Units |
-|--------|:-----:|:----------:|:-----:|
+| Metric      |                      Measures                       | Require entity | Units |
+|-------------|:---------------------------------------------------:|:--------------:|:-----:|
+| utilization |       The fraction of usage out of its limit        |       no       | Units |
+| usage       |         An amount used out of a known total         |       no       | Units |
+| io          | Data flow in bytes. For anything except networking. |      yes       | Units |
+| iops        |   I/O operations. For anything except networking.   |      yes       | Units |
+| ops         |             All operations except I/O.              |      yes       | Units |
+| traffic     |       I/O data flow in bits. Networking only.       |      yes       | Units |
+
+| Entity                             |          Measures          |
+|------------------------------------|:--------------------------:|
+| count                              |    Everything countable    |
+| size                               |    How big something is    |
+| duration, latency, period, elapsed | Everything related to time |
+| xfer                               |     Data flow in bytes     |
+
+| Type        |                       Usage                       |                                              Expressed as                                              |
+|-------------|:-------------------------------------------------:|:------------------------------------------------------------------------------------------------------:|
+| num         |          A sampled value at a given time          |                                          a number (summable)                                           |
+| nval (inam) |          A sampled value at a given time          |                                        a number (non-summable)                                         |
+| time        |          A sampled value at a given time          |                                                seconds                                                 |
+| perc        | A sampled value (number or ratio) at a given time |                                     a fraction of 100 (percentage)                                     |
+| rate        | Per-second average rate of increase of the metric |                                     a number (per-second average)                                      |
+| set         | Set of individual statuses/states at a given time |                    a series of related boolean (0,1) values, one boolean per state                     |
+| hist        |  The statistical distribution of a set of values  |           a series of calculated (agent side) values that are counted based on bucket values           |
+| sum (aggr)  |        The aggregated value of the metric         | a series of calculated (agent side) values that are counted based on aggregate functions (min/avg/max) |
 
 
 ## Metrics
