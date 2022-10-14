@@ -291,23 +291,67 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 | system.powersupply.energy.nval                                 |   power supply   |                                                                                                                                             energy                                                                                                                                             |       Wh       |
 | system.powersupply.voltage.nval                                |   power supply   |                                                                                                                                            voltage                                                                                                                                             |       V        |
 
-## TODO
+## Metric name
 
-| Metric      |                      Measures                       | Require entity | Units |
-|-------------|:---------------------------------------------------:|:--------------:|:-----:|
-| utilization |       The fraction of usage out of its limit        |       no       | Units |
-| usage       |         An amount used out of a known total         |       no       | Units |
-| io          | Data flow in bytes. For anything except networking. |      yes       | Units |
-| iops        |   I/O operations. For anything except networking.   |      yes       | Units |
-| ops         |             All operations except I/O.              |      yes       | Units |
-| traffic     |       I/O data flow in bits. Networking only.       |      yes       | Units |
+The metric name must contain the following parts:
 
-| Entity                             |          Measures          |
+- source
+- measurement
+- type
+
+It is written as `source.measurement.type`.
+
+### Metric source
+
+- Must identify an instance or entity **to which the measurement belongs**.
+- May consist of several components delimited by a dot (`.`).
+- The order of components must be from general to specific (left to right).
+
+Examples:
+
+- **system.cpu.core**: the number of interrupts belongs to the cpu core.
+- **system.memory**: RAM usage belongs to the system memory subsystem.
+- **system.network**: total system network traffic, and total ipv4/ipv6 pps belongs to the system networking subsystem.
+- **system.network.device**: a network device (interface) traffic, and total ipv4/ipv6 pps belongs to the network
+  device. The network device belongs to the system networking subsystem.
+
+### Metric measurement
+
+- Must explicitly express the measurement gist and leave no room for ambiguity. For example, "requests" is not a valid
+  measurement because it is not clear whether it measures quantity, size, or duration.
+- Must ends with "clarification" when require (see the table below).
+- May consist of several components delimited by a dot (`.`).
+- The order of components must be from general to specific (left to right).
+
+| Measurement   |                      Measures                       | Require clarification |
+|---------------|:---------------------------------------------------:|:---------------------:|
+| utilization   |       The fraction of usage out of its limit        |          no           |
+| usage         |   An amount used out of a known (to exist) total    |          no           |
+| state, status |         The current condition of something.         |          no           |
+| io            | Data flow in bytes. For anything except networking. |          yes          |
+| iops          |   I/O operations. For anything except networking.   |          yes          |
+| ops           |             All operations except I/O.              |          yes          |
+| traffic       |       I/O data flow in bits. Networking only.       |          yes          |
+
+| Clarification                      |          Measures          |
 |------------------------------------|:--------------------------:|
 | count                              |    Everything countable    |
 | size                               |    How big something is    |
 | duration, latency, period, elapsed | Everything related to time |
 | xfer                               |     Data flow in bytes     |
+
+Examples:
+
+- system.cpu.**utilization**
+- system.memory.ram.**usage**
+- system.memory.mgmt.paging.**io**.xfer
+- system.storage.device.**iops**.count
+- system.storage.device.**iops**.size
+- system.storage.device.**iops**.duration
+- system.storage.fs.nfs.server.**ops**.v4.per_op.count
+- system.network.**traffic**.ipv4.xfer.rate
+
+### Metric type
 
 | Type        |                       Usage                       |                                              Expressed as                                              |
 |-------------|:-------------------------------------------------:|:------------------------------------------------------------------------------------------------------:|
@@ -319,7 +363,6 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/proc.
 | set         | Set of individual statuses/states at a given time |                    a series of related boolean (0,1) values, one boolean per state                     |
 | hist        |  The statistical distribution of a set of values  |           a series of calculated (agent side) values that are counted based on bucket values           |
 | sum (aggr)  |        The aggregated value of the metric         | a series of calculated (agent side) values that are counted based on aggregate functions (min/avg/max) |
-
 
 ## Metrics
 
