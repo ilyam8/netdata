@@ -127,6 +127,9 @@ RUN chown -R root:root \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
     cp -va /etc/netdata /etc/netdata.stock
 
+COPY godplugin /usr/libexec/netdata/plugins.d/go.d.plugin
+COPY netdata.conf /etc/netdata/netdata.conf
+
 ENTRYPOINT ["/usr/sbin/run.sh"]
 
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /usr/sbin/health.sh
