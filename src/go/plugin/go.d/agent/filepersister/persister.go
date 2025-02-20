@@ -16,14 +16,23 @@ type Data interface {
 	Updated() <-chan struct{}
 }
 
+func Save(path string, data Data) {
+	if path == "" {
+		return
+	}
+	p := New(path)
+	p.data = data
+	p.flush()
+}
+
 func New(path string) *Persister {
 	return &Persister{
 		Logger: logger.New().With(
 			slog.String("component", "file persister"),
 			slog.String("file", path),
 		),
+		FlushEvery: time.Minute * 1,
 		filepath:   path,
-		flushEvery: time.Second * 5,
 		flushCh:    make(chan struct{}, 1),
 	}
 }
@@ -31,10 +40,11 @@ func New(path string) *Persister {
 type Persister struct {
 	*logger.Logger
 
-	data       Data
-	filepath   string
-	flushEvery time.Duration
-	flushCh    chan struct{}
+	FlushEvery time.Duration
+
+	data     Data
+	filepath string
+	flushCh  chan struct{}
 }
 
 func (p *Persister) Run(ctx context.Context, data Data) {
@@ -43,7 +53,7 @@ func (p *Persister) Run(ctx context.Context, data Data) {
 
 	p.data = data
 
-	tk := time.NewTicker(p.flushEvery)
+	tk := time.NewTicker(p.FlushEvery)
 	defer tk.Stop()
 	defer p.flush()
 
