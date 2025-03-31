@@ -3,9 +3,7 @@
 > 💡 This document is maintained by Netdata's community, and may not be completely up-to-date. Please double-check the
 > details of the installation process, before proceeding.
 >
-> You can help improve this document by
-> [submitting a PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md)
-> with your recommended improvements or changes. Thank you!
+> You can help improve this document by submitting a PR with your recommended improvements or changes. Thank you!
 
 The good news is that our
 [one-line installation script](/packaging/installer/methods/kickstart.md)
