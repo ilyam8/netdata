@@ -135,29 +135,6 @@ With these capabilities, Netdata Agent provides a powerful, automated monitoring
 | Low Maintenance               | • Auto-detection of metrics<br/>• Zero-touch machine learning<br/>• Easy scalability<br/>• CI/CD friendly deployment                                                                                                            |
 | Open & Extensible             | • Modular architecture<br/>• Easy to extend and customize<br/>• Integrates with existing monitoring tools<br/>• Active community ecosystem                                                                                      |
 
-### What can be monitored with the Netdata Agent
-
-Netdata monitors all the following:
-
-|                                                                                                   Component |              Linux               | FreeBSD | macOS |                                     Windows                                     |
-|------------------------------------------------------------------------------------------------------------:|:--------------------------------:|:-------:|:-----:|:-------------------------------------------------------------------------------:|
-|                             **System Resources**<small><br/>CPU, Memory and system shared resources</small> |               Full               |   Yes   |  Yes  |                                       Yes                                       |
-|                                **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |               Full               |   Yes   |  Yes  |                                       Yes                                       |
-|                                 **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |               Full               |   Yes   |  Yes  |                                       Yes                                       |
-|                        **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |               Full               |  Some   | Some  |                                      Some                                       |
-|                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |                                        -                                        |
-|                                      **Processes**<small><br/>Resources, Performance, OOM, and more</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
-|                                                                             System and Application **Logs** | Yes<small><br/>`systemd`-journal |    -    |   -   | Yes<small><br/>`Windows Event Log`, and<br/>`Event Tracing for Windows`</small> |
-|                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |    -    |   -   |                                        -                                        |
-|                               **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |               Yes                |    -    |   -   |                                        -                                        |
-|                                 **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> | Yes<small><br/>`cgroups`</small> |    -    |   -   |                        Yes<small><br/>`Hyper-V`</small>                         |
-|                       **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
-| **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
-|                              **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
-|                       **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
-
-When operating on Linux, the Netdata Agent continuously monitors every available kernel feature and all hardware sensors for errors. This covers Intel, AMD, and Nvidia GPUs, PCI Advanced Error Reporting (PCI AER), RAM Error Detection and Correction (RAM EDAC), Intelligent Platform Management Interface (IPMI), S.M.A.R.T. for disks, Intel Running Average Power Limit (Intel RAPL), NVMe disks, as well as fans, power supplies, voltage readings, and more.
-
 ---
 
 ### :star: Netdata is the most energy-efficient monitoring tool :star:
@@ -325,6 +302,11 @@ When your Netdata nodes are connected to Netdata Cloud, you can (on top of the a
 :ok_hand: Your metrics are still stored in your network when you connect your Netdata Agents and Parents to Netdata Cloud.
 
 <hr class="solid">
+
+## Lorem Ipsum
+
+What is Lorem Ipsum?
+Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
 
 ## How it works
 
