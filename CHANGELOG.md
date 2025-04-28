@@ -1,10 +1,3 @@
-# Changelog
-
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
-
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.4.0...HEAD)
-
-**Merged pull requests:**
 
 - Update README.md [\#20133](https://github.com/netdata/netdata/pull/20133) ([kanelatechnical](https://github.com/kanelatechnical))
 - Fix Locks \(Windows Locks\) [\#20131](https://github.com/netdata/netdata/pull/20131) ([thiagoftsm](https://github.com/thiagoftsm))
