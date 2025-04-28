@@ -1,4 +1,4 @@
-<p align="center">
+<p align="cent">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
 </a>
