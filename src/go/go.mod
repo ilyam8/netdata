@@ -2,6 +2,8 @@ module github.com/netdata/netdata/go/plugins
 
 go 1.24.0
 
+replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-20250915142728-f8b0ec565d09
+
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
 require (
