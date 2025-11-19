@@ -23,8 +23,12 @@
             "title": "The instance this rule should be applied to.",
             "description": "You can find the instance names on all charts at the instances drop down menu. Do not include the host name in this field."
           },
-          "host_labels": { "$ref": "#/definitions/matchHostLabels" },
-          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" }
+          "host_labels": {
+            "$ref": "#/definitions/matchHostLabels"
+          },
+          "instance_labels": {
+            "$ref": "#/definitions/matchInstanceLabels"
+          }
         },
         "required": [
           "on",
@@ -43,8 +47,12 @@
             "title": "The context of the instances this rule should be applied to.",
             "description": "The context is the code-name of each chart on the dashboard, that appears at the chart title bar, between the chart title and its unit of measurement, like: system.cpu, disk.io, etc."
           },
-          "host_labels": { "$ref": "#/definitions/matchHostLabels" },
-          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" }
+          "host_labels": {
+            "$ref": "#/definitions/matchHostLabels"
+          },
+          "instance_labels": {
+            "$ref": "#/definitions/matchInstanceLabels"
+          }
         },
         "required": [
           "on",
@@ -85,14 +93,26 @@
           "database_lookup": {
             "type": "object",
             "title": "Database Query to Get Value",
-            "description": "The database query to be executed to calculate the value of the alert. When set, the query is executed before any other calculations. The result of the query will be available as $this in further calculations.",
+            "description": "Tthe database query to be executed to calculate the value of the alert. When set, the query is executed before any other calculations. The result of the query will be available as $this in further calculations.",
             "properties": {
               "data_source": {
                 "type": "string",
                 "oneOf": [
-                  { "const": "samples", "title": "Samples", "description": "Use the time-series values for each dimension" },
-                  { "const": "percentages", "title": "Percentages", "description": "Use the percentage of each dimension vs the sum of all dimensions" },
-                  { "const": "anomalies", "title": "Anomalies", "description": "Use the anomaly rate of each dimension" }
+                  {
+                    "const": "samples",
+                    "title": "Samples",
+                    "description": "Use the time-series values for each dimension"
+                  },
+                  {
+                    "const": "percentages",
+                    "title": "Percentages",
+                    "description": "Use the percentage of each dimension vs the sum of all dimensions"
+                  },
+                  {
+                    "const": "anomalies",
+                    "title": "Anomalies",
+                    "description": "Use the anomaly rate of each dimension"
+                  }
                 ],
                 "default": "samples",
                 "title": " ",
@@ -101,20 +121,62 @@
               "time_group": {
                 "type": "string",
                 "oneOf": [
-                  { "const": "average", "title": "Average" },
-                  { "const": "median", "title": "Median" },
-                  { "const": "min", "title": "Minimum" },
-                  { "const": "max", "title": "Maximum" },
-                  { "const": "sum", "title": "Sum" },
-                  { "const": "incremental_sum", "title": "Incremental Sum" },
-                  { "const": "stddev", "title": "Standard Deviation" },
-                  { "const": "cv", "title": "Coefficient of Variation" },
-                  { "const": "trimmed-mean", "title": "Trimmed Mean" },
-                  { "const": "trimmed-median", "title": "Trimmed Median" },
-                  { "const": "percentile", "title": "Percentile" },
-                  { "const": "ses", "title": "Simple Exponential Smoothing" },
-                  { "const": "des", "title": "Double Exponential Smoothing" },
-                  { "const": "countif", "title": "Count If" }
+                  {
+                    "const": "average",
+                    "title": "Average"
+                  },
+                  {
+                    "const": "median",
+                    "title": "Median"
+                  },
+                  {
+                    "const": "min",
+                    "title": "Minimum"
+                  },
+                  {
+                    "const": "max",
+                    "title": "Maximum"
+                  },
+                  {
+                    "const": "sum",
+                    "title": "Sum"
+                  },
+                  {
+                    "const": "incremental_sum",
+                    "title": "Incremental Sum"
+                  },
+                  {
+                    "const": "stddev",
+                    "title": "Standard Deviation"
+                  },
+                  {
+                    "const": "cv",
+                    "title": "Coefficient of Variation"
+                  },
+                  {
+                    "const": "trimmed-mean",
+                    "title": "Trimmed Mean"
+                  },
+                  {
+                    "const": "trimmed-median",
+                    "title": "Trimmed Median"
+                  },
+                  {
+                    "const": "percentile",
+                    "title": "Percentile"
+                  },
+                  {
+                    "const": "ses",
+                    "title": "Simple Exponential Smoothing"
+                  },
+                  {
+                    "const": "des",
+                    "title": "Double Exponential Smoothing"
+                  },
+                  {
+                    "const": "countif",
+                    "title": "Count If"
+                  }
                 ],
                 "default": "average",
                 "title": "Time Aggregation",
@@ -135,11 +197,31 @@
               "dims_group": {
                 "type": "string",
                 "oneOf": [
-                  { "const": "average", "title": "Average", "description": "The average of all dimensions" },
-                  { "const": "min", "title": "Minimum", "description": "The minimum of all dimensions" },
-                  { "const": "max", "title": "Maximum", "description": "The maximum of all dimensions" },
-                  { "const": "sum", "title": "Sum", "description": "The sum of all dimensions" },
-                  { "const": "min2max", "title": "Min-to-Max", "description": "The delta between the minimum of the maximum of the dimensions" }
+                  {
+                    "const": "average",
+                    "title": "Average",
+                    "description": "The average of all dimensions"
+                  },
+                  {
+                    "const": "min",
+                    "title": "Minimum",
+                    "description": "The minimum of all dimensions"
+                  },
+                  {
+                    "const": "max",
+                    "title": "Maximum",
+                    "description": "The maximum of all dimensions"
+                  },
+                  {
+                    "const": "sum",
+                    "title": "Sum",
+                    "description": "The sum of all dimensions"
+                  },
+                  {
+                    "const": "min2max",
+                    "title": "Min-to-Max",
+                    "description": "The delta between the minimum of the maximum of the dimensions"
+                  }
                 ],
                 "default": "sum",
                 "title": "Dims Aggregation",
@@ -158,14 +240,31 @@
                 "uniqueItems": true,
                 "items": {
                   "oneOf": [
-                    { "const":  "unaligned", "title": "Do not shift the time-frame for visual presentation" },
-                    { "const":  "absolute", "title": "Make all values positive before using them" },
-                    { "const":  "null2zero", "title": "Treat gaps in the time-series as a zero value" },
-                    { "const":  "match_ids", "title": "Match only dimension IDs, not Names" },
-                    { "const":  "match_names", "title": "Match only dimension Names, not IDs" }
+                    {
+                      "const": "unaligned",
+                      "title": "Do not shift the time-frame for visual presentation"
+                    },
+                    {
+                      "const": "absolute",
+                      "title": "Make all values positive before using them"
+                    },
+                    {
+                      "const": "null2zero",
+                      "title": "Treat gaps in the time-series as a zero value"
+                    },
+                    {
+                      "const": "match_ids",
+                      "title": "Match only dimension IDs, not Names"
+                    },
+                    {
+                      "const": "match_names",
+                      "title": "Match only dimension Names, not IDs"
+                    }
                   ]
                 },
-                "default": [ "unaligned" ]
+                "default": [
+                  "unaligned"
+                ]
               }
             },
             "allOf": [
@@ -173,7 +272,9 @@
                 "if": {
                   "properties": {
                     "time_group": {
-                      "enum": ["trimmed-mean"]
+                      "enum": [
+                        "trimmed-mean"
+                      ]
                     }
                   }
                 },
@@ -186,14 +287,18 @@
                       "description": ""
                     }
                   },
-                  "required": ["time_group_value"]
+                  "required": [
+                    "time_group_value"
+                  ]
                 }
               },
               {
                 "if": {
                   "properties": {
                     "time_group": {
-                      "enum": ["trimmed-median"]
+                      "enum": [
+                        "trimmed-median"
+                      ]
                     }
                   }
                 },
@@ -206,14 +311,18 @@
                       "description": ""
                     }
                   },
-                  "required": ["time_group_value"]
+                  "required": [
+                    "time_group_value"
+                  ]
                 }
               },
               {
                 "if": {
                   "properties": {
                     "time_group": {
-                      "enum": ["percentile"]
+                      "enum": [
+                        "percentile"
+                      ]
                     }
                   }
                 },
@@ -226,7 +335,9 @@
                       "description": ""
                     }
                   },
-                  "required": ["time_group_value"]
+                  "required": [
+                    "time_group_value"
+                  ]
                 }
               },
               {
@@ -242,12 +353,30 @@
                     "time_group_condition": {
                       "type": "string",
                       "oneOf": [
-                        { "const": "!=", "title": "!=" },
-                        { "const": "=", "title": "==" },
-                        { "const": ">=", "title": ">=" },
-                        { "const": ">", "title": ">" },
-                        { "const": "<=", "title": "<=" },
-                        { "const": "<", "title": "<" }
+                        {
+                          "const": "!=",
+                          "title": "!="
+                        },
+                        {
+                          "const": "=",
+                          "title": "=="
+                        },
+                        {
+                          "const": ">=",
+                          "title": ">="
+                        },
+                        {
+                          "const": ">",
+                          "title": ">"
+                        },
+                        {
+                          "const": "<=",
+                          "title": "<="
+                        },
+                        {
+                          "const": "<",
+                          "title": "<"
+                        }
                       ],
                       "default": "equal",
                       "title": "Condition",
@@ -260,7 +389,10 @@
                       "description": ""
                     }
                   },
-                  "required": ["time_group_condition", "time_group_value"]
+                  "required": [
+                    "time_group_condition",
+                    "time_group_value"
+                  ]
                 }
               }
             ]
@@ -319,7 +451,10 @@
             "uniqueItems": true,
             "items": {
               "oneOf": [
-                { "const":  "no-clear-notification", "title": "Do not perform any action when the alert is cleared"}
+                {
+                  "const": "no-clear-notification",
+                  "title": "Do not perform any action when the alert is cleared"
+                }
               ]
             },
             "default": []
@@ -372,15 +507,33 @@
         "title": "Alert Configuration",
         "description": "The properties that control the value the alert will get, the conditions it will trigger, the back-off for notifications, the auto-repeating of notifications, etc.",
         "properties": {
-          "match": { "$ref": "#/definitions/matchInstance" },
-          "summary": { "$ref": "#/definitions/configSummary" },
-          "info": { "$ref": "#/definitions/configInfo" },
-          "type": { "$ref": "#/definitions/configType" },
-          "component": { "$ref": "#/definitions/configComponent" },
-          "classification": { "$ref": "#/definitions/configClassification" },
-          "value": { "$ref": "#/definitions/configValue" },
-          "conditions": { "$ref": "#/definitions/configConditions" },
-          "action": { "$ref": "#/definitions/configAction" }
+          "match": {
+            "$ref": "#/definitions/matchInstance"
+          },
+          "summary": {
+            "$ref": "#/definitions/configSummary"
+          },
+          "info": {
+            "$ref": "#/definitions/configInfo"
+          },
+          "type": {
+            "$ref": "#/definitions/configType"
+          },
+          "component": {
+            "$ref": "#/definitions/configComponent"
+          },
+          "classification": {
+            "$ref": "#/definitions/configClassification"
+          },
+          "value": {
+            "$ref": "#/definitions/configValue"
+          },
+          "conditions": {
+            "$ref": "#/definitions/configConditions"
+          },
+          "action": {
+            "$ref": "#/definitions/configAction"
+          }
         },
         "required": []
       },
@@ -389,15 +542,33 @@
         "title": "Alert Configuration",
         "description": "The properties that control the value the alert will get, the conditions it will trigger, the back-off for notifications, the auto-repeating of notifications, etc.",
         "properties": {
-          "match": { "$ref": "#/definitions/matchTemplate" },
-          "summary": { "$ref": "#/definitions/configSummary" },
-          "info": { "$ref": "#/definitions/configInfo" },
-          "type": { "$ref": "#/definitions/configType" },
-          "component": { "$ref": "#/definitions/configComponent" },
-          "classification": { "$ref": "#/definitions/configClassification" },
-          "value": { "$ref": "#/definitions/configValue" },
-          "conditions": { "$ref": "#/definitions/configConditions" },
-          "action": { "$ref": "#/definitions/configAction" }
+          "match": {
+            "$ref": "#/definitions/matchTemplate"
+          },
+          "summary": {
+            "$ref": "#/definitions/configSummary"
+          },
+          "info": {
+            "$ref": "#/definitions/configInfo"
+          },
+          "type": {
+            "$ref": "#/definitions/configType"
+          },
+          "component": {
+            "$ref": "#/definitions/configComponent"
+          },
+          "classification": {
+            "$ref": "#/definitions/configClassification"
+          },
+          "value": {
+            "$ref": "#/definitions/configValue"
+          },
+          "conditions": {
+            "$ref": "#/definitions/configConditions"
+          },
+          "action": {
+            "$ref": "#/definitions/configAction"
+          }
         },
         "required": []
       }
@@ -425,28 +596,43 @@
             "type": {
               "type": "string",
               "oneOf": [
-                { "const":  "instance" , "title": "A specific Instance" },
-                { "const":  "template" , "title": "Each of the Instances" }
+                {
+                  "const": "instance",
+                  "title": "A specific Instance"
+                },
+                {
+                  "const": "template",
+                  "title": "Each of the Instances"
+                }
               ],
               "default": "template",
               "title": "Apply this rule to:",
               "description": ""
             }
           },
-          "required": [ "type", "enabled" ],
+          "required": [
+            "type",
+            "enabled"
+          ],
           "if": {
             "properties": {
-              "type": { "const": "instance" }
+              "type": {
+                "const": "instance"
+              }
             }
           },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/configInstance" }
+              "config": {
+                "$ref": "#/definitions/configInstance"
+              }
             }
           },
           "else": {
             "properties": {
-              "config": { "$ref": "#/definitions/configTemplate" }
+              "config": {
+                "$ref": "#/definitions/configTemplate"
+              }
             }
           }
         }
@@ -458,61 +644,71 @@
   },
   "uiSchema": {
     "uiOptions": {
-      "fullPage": true
+      "card": {
+        "iconColor": "var(--nd-color-sec-10)",
+        "iconName": "nd-alert-warning-05",
+        "levelColor": "var(--nd-color-txt)",
+        "levelName": "ALERT",
+        "title": "Health alerts"
+      },
+      "controls": {
+        "add": {
+          "icon": "nd-add-01",
+          "label": "Add alert rule"
+        }
+      }
     },
-    "format_version": {
-      "ui:widget": "hidden"
-    },
-    "name": {
-      "ui:widget": "hidden"
-    },
+    "format_version": 2,
+    "name": "health:alert:prototype",
     "rules": {
-      "ui:openEmptyItem":  true,
+      "ui:openEmptyItem": true,
       "items": {
-        "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
+        "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
         "enabled": {
-          "ui:classNames": "dyncfg-grid-col-span-1-2",
-          "ui:widget": "checkbox"
+          "ui:classNames": "dyncfg-grid-col-span-1-1"
         },
         "type": {
-          "ui:classNames": "dyncfg-grid-col-span-5-2",
-          "ui:help": "Rules can be configured to match a specific instance (like a specific disk), or match all the instances (like all the disks). All rules are always checked against all nodes streamed to this Netdata, so the matching rules include patterns to match both instances and nodes.",
-          "ui:widget": "radio",
+          "ui:classNames": "dyncfg-grid-col-span-2-2",
+          "ui:widget": "tabs",
           "ui:options": {
-            "flavour": "buttonGroup"
+            "tabs": [
+              {
+                "title": "A specific instance",
+                "value": "instance"
+              },
+              {
+                "title": "Each of the instances",
+                "value": "template"
+              }
+            ]
           }
         },
         "config": {
           "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
-          "ui:flavour": "tabs",
+          "ui:flavour": "card",
           "ui:options": {
             "tabs": [
               {
-                "title": "Match",
+                "title": "What to monitor",
                 "fields": [
                   "match"
                 ]
               },
               {
-                "title": "Value",
+                "title": "When to alert",
                 "fields": [
-                  "value"
-                ]
-              },
-              {
-                "title": "Triggers",
-                "fields": [
+                  "value",
                   "conditions"
                 ]
               },
               {
-                "title": "Action",
+                "title": "Notifications",
                 "fields": [
                   "action"
                 ]
               },
               {
-                "title": "Description",
+                "title": "Metadata (optional)",
                 "fields": [
                   "summary",
                   "info",
@@ -526,40 +722,80 @@
           "match": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "on": {
+              "ui:title": "Chart / context",
               "ui:classNames": "dyncfg-grid-col-span-1-6",
               "ui:widget": "ContextWidget"
             },
             "host_labels": {
-              "ui:help": "A simple pattern to match the node labels of the nodes this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard.",
-              "ui:classNames": "dyncfg-grid-col-span-1-3"
+              "ui:help": "Match only nodes with these labels (space-separated `key=value`, `*` allowed).",
+              "ui:classNames": "dyncfg-grid-col-span-1-3",
+              "ui:options": {
+                "placeholder": "role=db env=prod"
+              }
             },
             "instance_labels": {
               "ui:classNames": "dyncfg-grid-col-span-4-3",
-              "ui:help": "A simple pattern to match the instance labels of the instances this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard."
+              "ui:help": "Match only instances with these labels (space-separated `key=value`, `*` allowed).",
+              "ui:options": {
+                "placeholder": "disk_type=ssd"
+              }
             }
           },
           "summary": {
-            "ui:classNames": "dyncfg-grid-col-span-1-3"
+            "ui:classNames": "dyncfg-grid-col-span-1-3",
+            "ui:title": "Alert summary",
+            "ui:options": {
+              "placeholder": "Short title for this alert"
+            }
           },
           "info": {
-            "ui:classNames": "dyncfg-grid-col-span-4-3"
+            "ui:classNames": "dyncfg-grid-col-span-4-3",
+            "ui:title": "Detailed description",
+            "ui:widget": "textarea",
+            "ui:options": {
+              "rows": 3,
+              "placeholder": "Explain what this alert means and how to respond."
+            }
           },
           "type": {
-            "ui:classNames": "dyncfg-grid-col-span-1-2"
+            "ui:classNames": "dyncfg-grid-col-span-1-2",
+            "ui:title": "Category",
+            "ui:options": {
+              "placeholder": "e.g. System, Containers"
+            }
           },
           "component": {
-            "ui:classNames": "dyncfg-grid-col-span-3-2"
+            "ui:classNames": "dyncfg-grid-col-span-3-2",
+            "ui:title": "Component",
+            "ui:options": {
+              "placeholder": "e.g. CPU, Disk, nginx"
+            }
           },
           "classification": {
-            "ui:classNames": "dyncfg-grid-col-span-5-2"
+            "ui:classNames": "dyncfg-grid-col-span-5-2",
+            "ui:title": "Alert type",
+            "ui:options": {
+              "placeholder": "e.g. Utilization, Errors"
+            }
           },
           "value": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "database_lookup": {
-              "ui:order": ["data_source", "time_group", "time_group_condition", "time_group_value", "after", "before", "dims_group", "dimensions", "options"],
+              "ui:title": "Advanced query options",
+              "ui:order": [
+                "data_source",
+                "time_group",
+                "after",
+                "before",
+                "dims_group",
+                "dimensions",
+                "time_group_condition",
+                "time_group_value",
+                "options"
+              ],
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "ui:collapsible": true,
-              "ui:initiallyExpanded": true,
+              "ui:initiallyExpanded": false,
               "data_source": {
                 "ui:widget": "radio",
                 "ui:options": {
@@ -568,94 +804,120 @@
                 "ui:classNames": "dyncfg-grid-col-span-1-6"
               },
               "time_group": {
-                "ui:help": "When querying time-series data we need to come up with a single value. This function is used to aggregate all the values of the time-series data to a single value.",
+                "ui:title": "Function",
+                "ui:help": "How to aggregate raw samples over the time window (e.g. average, max).",
                 "ui:classNames": "dyncfg-grid-col-span-1-2"
               },
               "time_group_condition": {
+                "ui:title": "Advanced condition (optional)",
                 "ui:classNames": "dyncfg-grid-col-span-3-1"
               },
               "time_group_value": {
+                "ui:title": "Condition value",
                 "ui:classNames": "dyncfg-grid-col-span-4-1"
               },
               "after": {
-                "ui:help": "The oldest timestamp of the time-series data to be included in the query. Negative values define a duration in seconds in the past of 'To' (so, -60 means a minute ago from 'To').",
+                "ui:title": "Look back (seconds)",
+                "ui:help": "How far back from 'End' to include data (negative seconds).",
                 "ui:classNames": "dyncfg-grid-col-span-1-1"
               },
               "before": {
-                "ui:help": "The newest timestamp of the time-series data to be included in the query. Negative value define a duration in seconds in the past (so, -60 means a minute ago). Zero means now.",
+                "ui:title": "End (seconds from now)",
+                "ui:help": "Offset of the end of the window relative to now (0 = now).",
                 "ui:classNames": "dyncfg-grid-col-span-2-1"
               },
               "dims_group": {
-                "ui:help": "After each dimension has a single computed value, use this algorithm to derive the final value.",
+                "ui:title": "Combine dimensions",
+                "ui:help": "How to combine values from multiple dimensions into a single number.",
                 "ui:classNames": "dyncfg-grid-col-span-3-2"
               },
               "dimensions": {
-                "ui:help": "A simple pattern to match the dimensions that should be included in the query",
-                "ui:classNames": "dyncfg-grid-col-span-5-2"
+                "ui:help": "Pattern for dimensions to include in the query (e.g. `*`, `iowait`, `sd*`).",
+                "ui:classNames": "dyncfg-grid-col-span-5-2",
+                "ui:options": {
+                  "placeholder": "iowait"
+                }
               },
               "options": {
                 "ui:classNames": "dyncfg-grid-col-span-1-6"
               }
             },
             "calculation": {
-              "ui:help": "The database value is available as '$this'. This expression can utilize variables to transform the value of the alert.",
+              "ui:help": "Use $this for the calculated value and optionally apply math to transform it.",
               "ui:classNames": "dyncfg-grid-col-span-1-4",
-              "ui:placeholder": "$this * 1"
+              "ui:placeholder": "$this"
             },
             "units": {
-              "ui:help": "The unit of measurement the alert value is expressed with. If unset, the units of the instance the alert is attached to will be used.",
+              "ui:help": "Override the unit shown for this alert. Leave empty to use the chart units.",
               "ui:classNames": "dyncfg-grid-col-span-5-1"
             },
             "update_every": {
-              "ui:help": "The frequency this alarm is to be evaluated, in seconds.",
+              "ui:title": "Check every (seconds)",
+              "ui:help": "How often Netdata should evaluate this alert.",
               "ui:classNames": "dyncfg-grid-col-span-6-1"
             }
           },
           "conditions": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "warning_condition": {
-              "ui:classNames": "dyncfg-grid-col-span-1-6"
+              "ui:title": "Warning condition",
+              "ui:classNames": "dyncfg-grid-col-span-1-6",
+              "ui:placeholder": "$this > 20",
+              "ui:help": "Expression that makes the alert WARNING when it is non-zero. Example: $this > 20"
             },
             "critical_condition": {
-              "ui:classNames": "dyncfg-grid-col-span-1-6"
+              "ui:title": "Critical condition",
+              "ui:classNames": "dyncfg-grid-col-span-1-6",
+              "ui:placeholder": "$this > 40",
+              "ui:help": "Expression that makes the alert CRITICAL when it is non-zero. Example: $this > 40"
             }
           },
           "action": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "execute": {
+              "ui:title": "Custom command (optional)",
               "ui:classNames": "dyncfg-grid-col-span-1-3",
-              "ui:help": "Leave this empty to get the default alert notification"
+              "ui:help": "Command to run when the alert changes state. Leave empty for default behavior."
             },
             "recipient": {
+              "ui:title": "Send notifications to",
               "ui:classNames": "dyncfg-grid-col-span-4-1",
-              "ui:help": "A space separated list of the recipients of the alert notifications. The special recipient 'silent' prevents this alert from taking any action (i.e. sending notifications)."
+              "ui:help": "Space-separated recipients. Use 'silent' to keep this alert from sending notifications.",
+              "ui:options": {
+                "placeholder": "e.g. default, sysadmin, silent"
+              }
             },
             "options": {
+              "ui:title": "Advanced options",
               "ui:classNames": "dyncfg-grid-col-span-5-2",
-              "ui:help": "Options related to the actions this alert will take."
+              "ui:help": "Options related to the actions this alert will take.",
+              "ui:collapsible": true,
+              "ui:initiallyExpanded": false
             },
             "delay": {
+              "ui:title": "Delay notifications",
               "ui:collapsible": true,
               "ui:initiallyExpanded": false,
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "up": {
                 "ui:classNames": "dyncfg-grid-col-span-1-2",
-                "ui:help": "Delay the action (notification) that many seconds, when the alert is rising."
+                "ui:help": "Delay the action (notification) that many seconds when the alert is rising."
               },
               "down": {
                 "ui:classNames": "dyncfg-grid-col-span-3-2",
-                "ui:help": "Delay the action (notification) that many seconds, when the alert is recovering."
+                "ui:help": "Delay the action (notification) that many seconds when the alert is recovering."
               },
               "multiplier": {
                 "ui:classNames": "dyncfg-grid-col-span-5-1",
-                "ui:help": "Multiply the delay by this number, every time the alert transitions to a new state, while the action (notification) is being delayed."
+                "ui:help": "Multiply the delay by this number every time the alert enters a new state while notification is being delayed."
               },
               "max": {
                 "ui:classNames": "dyncfg-grid-col-span-6-1",
-                "ui:help": "The maximum acceptable delay in seconds, for taking the action (notification)."
+                "ui:help": "The maximum acceptable delay in seconds for taking the action (notification)."
               }
             },
             "repeat": {
+              "ui:title": "Auto-repeat while alert is active",
               "ui:collapsible": true,
               "ui:initiallyExpanded": false,
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
@@ -664,22 +926,22 @@
               },
               "warning": {
                 "ui:classNames": "dyncfg-grid-col-span-3-2",
-                "ui:help": "The number of seconds to repeat the action while the alert is in warning state"
+                "ui:help": "Number of seconds between repeats while the alert is in WARNING state."
               },
               "critical": {
                 "ui:classNames": "dyncfg-grid-col-span-5-2",
-                "ui:help": "The number of seconds to repeat the action while the alert is in critical state"
+                "ui:help": "Number of seconds between repeats while the alert is in CRITICAL state."
               }
             }
           },
           "hash": {
-            "ui:widget": "hidden"
+            "ui:classNames": "dyncfg-grid-col-span-1-2"
           },
           "source_type": {
-            "ui:widget": "hidden"
+            "ui:classNames": "dyncfg-grid-col-span-3-2"
           },
           "source": {
-            "ui:widget": "hidden"
+            "ui:classNames": "dyncfg-grid-col-span-5-2"
           }
         }
       }
