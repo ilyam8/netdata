@@ -19,8 +19,8 @@ An **`alarm`** is a chart-specific alert. It is tied to **one particular chart**
 |--------|-------------|
 | **Scope** | Exactly one chart (for example, a particular filesystem usage chart or a single network interface chart) |
 | **Use when** | You know exactly which chart you want to monitor and you want instance-specific thresholds or behavior |
-| **Examples** | • Alert if the **root filesystem** on this node is more than 90% full<br/>• Alert if **eth0** has packet error rate above a threshold |
-| **Characteristics** | • The `alarm` definition targets a single chart, so it only exists where that chart exists<br/>• If that chart is not present on a given node, the alert is not created on that node<br/>• You can define multiple different `alarm` rules for different charts on the same host |
+| **Examples** | • Alert if the **root filesystem** on this node is more than 90% full<br\>• Alert if **eth0** has packet error rate above a threshold |
+| **Characteristics** | • The `alarm` definition targets a single chart, so it only exists where that chart exists<br\>• If that chart is not present on a given node, the alert is not created on that node<br\>• You can define multiple different `alarm` rules for different charts on the same host |
 
 :::note
 
@@ -36,8 +36,8 @@ A **`template`** is a context-based alert. It is attached to a **context** (a ch
 |--------|-------------|
 | **Scope** | All charts that share the same context (for example, all disks, all network interfaces, all containers) |
 | **Use when** | You want one rule to monitor every instance of a type without writing separate alerts for each chart |
-| **Examples** | • Alert if **any network interface** uses more than 90% of its bandwidth<br/>• Alert if **any filesystem** on the host has less than 5% free space<br/>• Alert if **any container** exceeds a CPU utilization threshold |
-| **Characteristics** | • The `template` definition is written once per context<br/>• At runtime, the health engine automatically instantiates this template for every chart that matches that context<br/>• New charts of that context (for example, a new disk or container) automatically inherit the alert without additional configuration |
+| **Examples** | • Alert if **any network interface** uses more than 90% of its bandwidth<br\>• Alert if **any filesystem** on the host has less than 5% free space<br\>• Alert if **any container** exceeds a CPU utilization threshold |
+| **Characteristics** | • The `template` definition is written once per context<br\>• At runtime, the health engine automatically instantiates this template for every chart that matches that context<br\>• New charts of that context (for example, a new disk or container) automatically inherit the alert without additional configuration |
 
 :::note
 
@@ -51,18 +51,18 @@ Both `alarm` and `template` use the same underlying mechanisms (metric lookups, 
 
 ```mermaid
 flowchart TD
-    Start{{"Do you need to monitor<br/>multiple similar components?"}}
+    Start{{"Do you need to monitor<br\>multiple similar components?"}}
     
-    Start -->|Yes| Multiple("**Use `template`**<br/>One rule applies to all<br/>matching charts automatically")
-    Start -->|No| Single("**Use `alarm`**<br/>Target one specific<br/>chart instance")
+    Start -->|Yes| Multiple("**Use `template`**<br\>One rule applies to all<br\>matching charts automatically")
+    Start -->|No| Single("**Use `alarm`**<br\>Target one specific<br\>chart instance")
     
-    Multiple --> Examples1("**Examples:**<br/>- All network interfaces<br/>- All filesystems<br/>- All containers<br/>- All disk devices")
+    Multiple --> Examples1("**Examples:**<br\>- All network interfaces<br\>- All filesystems<br\>- All containers<br\>- All disk devices")
     
-    Single --> Examples2("**Examples:**<br/>- Root filesystem only<br/>- eth0 interface only<br/>- Specific database volume<br/>- Critical service chart")
+    Single --> Examples2("**Examples:**<br\>- Root filesystem only<br\>- eth0 interface only<br\>- Specific database volume<br\>- Critical service chart")
     
-    Multiple --> Benefits1("**Benefits:**<br/>✓ Auto-covers new instances<br/>✓ Consistent thresholds<br/>✓ Less configuration")
+    Multiple --> Benefits1("**Benefits:**<br\>✓ Auto-covers new instances<br\>✓ Consistent thresholds<br\>✓ Less configuration")
     
-    Single --> Benefits2("**Benefits:**<br/>✓ Instance-specific thresholds<br/>✓ Special cases<br/>✓ Fine-grained control")
+    Single --> Benefits2("**Benefits:**<br\>✓ Instance-specific thresholds<br\>✓ Special cases<br\>✓ Fine-grained control")
 
     %% Style definitions
     classDef decision fill:#2196F3,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
