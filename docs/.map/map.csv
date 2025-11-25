@@ -164,7 +164,7 @@ https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/not
 cloud_notifications_integrations,,,,
 https://github.com/netdata/netdata/edit/master/src/health/REFERENCE.md,Alert Configuration Reference,Published,Alerts & Notifications,
 https://github.com/netdata/netdata/edit/master/src/web/api/health/README.md,Health API Calls,Published,Alerts & Notifications,
-https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/what-is-a-netdata-alert.md,What is a Netdata Alert?,Published,Alerts & Notifications/Book/Understanding Alerts,
+https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/what-is-a-netdata-alert.md,What is a Netdata Alert,Published,Alerts & Notifications/Book/Understanding Alerts,
 https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/alert-types-alarm-vs-template.md,Alert Types: alarm versus template,Published,Alerts & Notifications/Book/Understanding Alerts,
 https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/where-alerts-live.md,"Where Alerts Live (Files, Agent, Cloud)",Published,Alerts & Notifications/Book/Understanding Alerts,
 ,,,,
