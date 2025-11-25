@@ -164,6 +164,7 @@ https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/not
 cloud_notifications_integrations,,,,
 https://github.com/netdata/netdata/edit/master/src/health/REFERENCE.md,Alert Configuration Reference,Published,Alerts & Notifications,
 https://github.com/netdata/netdata/edit/master/src/web/api/health/README.md,Health API Calls,Published,Alerts & Notifications,
+https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/what-is-a-netdata-alert.md,Understanding Alerts,Published,Alerts & Notifications/Book,
 ,,,,
 https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md,Netdata AI,Published,Netdata AI,
 https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-insights.md,Insights,Published,Netdata AI/Insights,
