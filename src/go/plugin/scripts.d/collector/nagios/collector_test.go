@@ -48,6 +48,9 @@ func TestCollector_InitCollectCleanup(t *testing.T) {
 	if len(reg.ensured) != 1 {
 		t.Fatalf("expected one ensure call, got %d", len(reg.ensured))
 	}
+	if !reg.ensured[0].Builtin {
+		t.Fatalf("expected default scheduler ensure to set builtin=true")
+	}
 	if len(reg.attached) != 1 {
 		t.Fatalf("expected one attach call, got %d", len(reg.attached))
 	}
@@ -104,6 +107,26 @@ func TestCollector_InitCollectCleanup(t *testing.T) {
 	}
 	if len(reg.removed) != 1 || reg.removed[0] != "default" {
 		t.Fatalf("unexpected remove calls: %v", reg.removed)
+	}
+}
+
+func TestCollector_InitSetsBuiltinFalseForNonDefaultScheduler(t *testing.T) {
+	reg := newFakeRegistry()
+	coll := NewWithRegistry(reg)
+	coll.Config.JobConfig = spec.JobConfig{
+		Name:      "check_custom",
+		Scheduler: "custom",
+		Plugin:    "/bin/true",
+	}
+
+	if err := coll.Init(context.Background()); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+	if len(reg.ensured) != 1 {
+		t.Fatalf("expected one ensure call, got %d", len(reg.ensured))
+	}
+	if reg.ensured[0].Builtin {
+		t.Fatalf("expected non-default scheduler ensure to set builtin=false")
 	}
 }
 

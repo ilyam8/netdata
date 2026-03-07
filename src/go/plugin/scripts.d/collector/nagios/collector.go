@@ -93,6 +93,7 @@ func (c *Collector) Init(context.Context) error {
 		Name:           c.jobSpec.Scheduler,
 		Workers:        c.Workers,
 		QueueSize:      c.QueueSize,
+		Builtin:        c.jobSpec.Scheduler == "default",
 		LoggingEnabled: true,
 		Logging: runtime.OTLPEmitterConfig{
 			Endpoint: runtime.DefaultOTLPEndpoint,
