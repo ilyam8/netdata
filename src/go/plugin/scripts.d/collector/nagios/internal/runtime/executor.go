@@ -27,6 +27,8 @@ type JobRuntime struct {
 	ID    string
 	Spec  spec.JobSpec
 	Vnode VnodeInfo
+	// Generation identifies one concrete registration lifecycle for a job ID.
+	Generation uint64
 }
 
 // ExecutionResult contains the outcome of a plugin invocation.
@@ -44,6 +46,7 @@ type ExecutionResult struct {
 	Duration  time.Duration
 	WorkerIdx int
 	Usage     ndexec.ResourceUsage
+	Executed  bool
 }
 
 // WorkFunc executes a Nagios job and returns the result.
@@ -69,12 +72,18 @@ type Executor struct {
 	resetNeeded bool
 
 	mu        sync.Mutex
-	inflight  map[string]struct{}
-	executing map[string]struct{}
+	inflight  map[executionKey]struct{}
+	executing map[executionKey]struct{}
+	canceled  map[executionKey]struct{}
 
 	wg sync.WaitGroup
 
 	skipped atomic.Uint64
+}
+
+type executionKey struct {
+	jobID      string
+	generation uint64
 }
 
 // ExecutorStats captures instantaneous telemetry for the executor internals.
@@ -98,8 +107,9 @@ func NewExecutor(cfg ExecutorConfig) (*Executor, error) {
 
 	exec := &Executor{
 		cfg:       cfg,
-		inflight:  make(map[string]struct{}),
-		executing: make(map[string]struct{}),
+		inflight:  make(map[executionKey]struct{}),
+		executing: make(map[executionKey]struct{}),
+		canceled:  make(map[executionKey]struct{}),
 	}
 	exec.resetChannels()
 
@@ -146,13 +156,14 @@ func (e *Executor) Enqueue(job JobRuntime) (bool, error) {
 	if e.ctx == nil {
 		return false, ErrExecutorStopped
 	}
+	key := newExecutionKey(job)
 	e.mu.Lock()
-	if _, exists := e.inflight[job.ID]; exists {
+	if _, exists := e.inflight[key]; exists {
 		e.mu.Unlock()
 		e.skipped.Add(1)
 		return false, nil
 	}
-	e.inflight[job.ID] = struct{}{}
+	e.inflight[key] = struct{}{}
 	e.mu.Unlock()
 
 	select {
@@ -160,10 +171,26 @@ func (e *Executor) Enqueue(job JobRuntime) (bool, error) {
 		return true, nil
 	case <-e.ctx.Done():
 		e.mu.Lock()
-		delete(e.inflight, job.ID)
+		delete(e.inflight, key)
 		e.mu.Unlock()
 		return false, ErrExecutorStopped
 	}
+}
+
+// Cancel prevents a queued job from starting if it has not reached execution yet.
+func (e *Executor) Cancel(job JobRuntime) {
+	key := newExecutionKey(job)
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if _, ok := e.inflight[key]; !ok {
+		return
+	}
+	if _, executing := e.executing[key]; executing {
+		return
+	}
+	e.canceled[key] = struct{}{}
 }
 
 // Results exposes the channel of execution results for the scheduler/state machine.
@@ -192,17 +219,26 @@ func (e *Executor) workerLoop(idx int) {
 		case <-e.ctx.Done():
 			return
 		case job := <-e.queue:
+			key := newExecutionKey(job)
+
 			// Mark the job as executing.
 			e.mu.Lock()
-			e.executing[job.ID] = struct{}{}
+			if _, canceled := e.canceled[key]; canceled {
+				delete(e.canceled, key)
+				delete(e.inflight, key)
+				e.mu.Unlock()
+				continue
+			}
+			e.executing[key] = struct{}{}
 			e.mu.Unlock()
 
 			res := e.cfg.Work(e.ctx, job)
 			res.WorkerIdx = idx
 
 			e.mu.Lock()
-			delete(e.executing, job.ID)
-			delete(e.inflight, job.ID)
+			delete(e.executing, key)
+			delete(e.inflight, key)
+			delete(e.canceled, key)
 			e.mu.Unlock()
 
 			select {
@@ -211,5 +247,12 @@ func (e *Executor) workerLoop(idx int) {
 				return
 			}
 		}
+	}
+}
+
+func newExecutionKey(job JobRuntime) executionKey {
+	return executionKey{
+		jobID:      job.ID,
+		generation: job.Generation,
 	}
 }

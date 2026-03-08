@@ -7,14 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/execution"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/runtime"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/schedulers"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 )
 
@@ -35,8 +34,8 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 }
 
 func TestCollector_InitCollectCleanup(t *testing.T) {
-	reg := newFakeRegistry()
-	coll := NewWithRegistry(reg)
+	svc := newFakeExecutionService()
+	coll := NewWithExecutionService(svc)
 	coll.Config.JobConfig = spec.JobConfig{
 		Name:   "check_disk",
 		Plugin: "/bin/true",
@@ -45,25 +44,15 @@ func TestCollector_InitCollectCleanup(t *testing.T) {
 	if err := coll.Init(context.Background()); err != nil {
 		t.Fatalf("init failed: %v", err)
 	}
-	if len(reg.ensured) != 1 {
-		t.Fatalf("expected one ensure call, got %d", len(reg.ensured))
+	if len(svc.attached) != 1 {
+		t.Fatalf("expected one attach call, got %d", len(svc.attached))
 	}
-	if !reg.ensured[0].Builtin {
-		t.Fatalf("expected default scheduler ensure to set builtin=true")
-	}
-	if len(reg.attached) != 1 {
-		t.Fatalf("expected one attach call, got %d", len(reg.attached))
+	if got := svc.attached[0].Spec.Name; got != "check_disk" {
+		t.Fatalf("attached job name = %q, want %q", got, "check_disk")
 	}
 
-	reg.snapshots["default"] = runtime.SchedulerSnapshot{
-		Scheduler: "default",
-		Running:   1,
-		Queued:    2,
-		Scheduled: 3,
-		Started:   4,
-		Finished:  5,
-		Skipped:   6,
-		Jobs: []runtime.JobMetricsSnapshot{
+	svc.snapshot = execution.Snapshot{
+		Jobs: []execution.JobSnapshot{
 			{
 				JobID:      "",
 				JobName:    "check_disk",
@@ -87,10 +76,10 @@ func TestCollector_InitCollectCleanup(t *testing.T) {
 
 	read := coll.MetricStore().Read(metrix.ReadRaw())
 	flat := coll.MetricStore().Read(metrix.ReadFlatten())
-	assertMetricValue(t, read, "nagios.scheduler.running", metrix.Labels{"nagios_scheduler": "default"}, 1)
-	assertMetricValue(t, flat, "nagios.job.state", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk", "nagios.job.state": "ok"}, 1)
-	assertMetricValue(t, flat, "nagios.true.bytes_used_value", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
-	point, ok := read.MeasureSet("nagios.true.bytes_used", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"})
+	assertMetricMissing(t, read, "nagios.scheduler.running", metrix.Labels{})
+	assertMetricValue(t, flat, "nagios.job.state", metrix.Labels{"nagios_job": "check_disk", "nagios.job.state": "ok"}, 1)
+	assertMetricValue(t, flat, "nagios.true.bytes_used_value", metrix.Labels{"nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
+	point, ok := read.MeasureSet("nagios.true.bytes_used", metrix.Labels{"nagios_job": "check_disk"})
 	if !ok {
 		t.Fatalf("expected raw measureset for nagios.true.bytes_used")
 	}
@@ -112,86 +101,43 @@ func TestCollector_InitCollectCleanup(t *testing.T) {
 	}
 
 	coll.Cleanup(context.Background())
-	if reg.detached != 1 {
-		t.Fatalf("expected one detach call, got %d", reg.detached)
-	}
-	if len(reg.removed) != 1 || reg.removed[0] != "default" {
-		t.Fatalf("unexpected remove calls: %v", reg.removed)
+	if svc.detached != 1 {
+		t.Fatalf("expected one detach call, got %d", svc.detached)
 	}
 }
 
-func TestCollector_InitSetsBuiltinFalseForNonDefaultScheduler(t *testing.T) {
-	reg := newFakeRegistry()
-	coll := NewWithRegistry(reg)
-	coll.Config.JobConfig = spec.JobConfig{
-		Name:      "check_custom",
-		Scheduler: "custom",
-		Plugin:    "/bin/true",
-	}
-
-	if err := coll.Init(context.Background()); err != nil {
-		t.Fatalf("init failed: %v", err)
-	}
-	if len(reg.ensured) != 1 {
-		t.Fatalf("expected one ensure call, got %d", len(reg.ensured))
-	}
-	if reg.ensured[0].Builtin {
-		t.Fatalf("expected non-default scheduler ensure to set builtin=false")
+func TestCollector_NewUsesSharedExecutionService(t *testing.T) {
+	coll := New()
+	if coll.service != sharedExecutionService {
+		t.Fatalf("expected New() to use shared execution service")
 	}
 }
 
-type fakeRegistry struct {
-	ensured  []schedulers.Definition
-	attached []runtime.JobRegistration
-	removed  []string
+type fakeExecutionService struct {
+	attached []execution.Registration
 	detached int
-
-	snapshots map[string]runtime.SchedulerSnapshot
+	snapshot execution.Snapshot
 }
 
-func newFakeRegistry() *fakeRegistry {
-	return &fakeRegistry{
-		snapshots: make(map[string]runtime.SchedulerSnapshot),
-	}
+func newFakeExecutionService() *fakeExecutionService {
+	return &fakeExecutionService{}
 }
 
-func (f *fakeRegistry) Ensure(def schedulers.Definition, _ *logger.Logger) error {
-	f.ensured = append(f.ensured, def)
-	return nil
-}
-
-func (f *fakeRegistry) Remove(name string) error {
-	f.removed = append(f.removed, name)
-	return nil
-}
-
-func (f *fakeRegistry) Attach(_ string, reg runtime.JobRegistration, _ *logger.Logger) (*schedulers.SchedulerJobHandle, error) {
+func (f *fakeExecutionService) Attach(reg execution.Registration) (*execution.JobHandle, error) {
 	f.attached = append(f.attached, reg)
-	return &schedulers.SchedulerJobHandle{}, nil
+	return &execution.JobHandle{}, nil
 }
 
-func (f *fakeRegistry) Detach(_ *schedulers.SchedulerJobHandle) {
+func (f *fakeExecutionService) Detach(_ *execution.JobHandle) {
 	f.detached++
 }
 
-func (f *fakeRegistry) Snapshot(name string) (runtime.SchedulerSnapshot, bool) {
-	s, ok := f.snapshots[name]
-	return s, ok
+func (f *fakeExecutionService) Snapshot() execution.Snapshot {
+	return f.snapshot
 }
 
-func (f *fakeRegistry) Get(name string) (schedulers.Definition, bool) {
-	for _, def := range f.ensured {
-		if def.Name == name {
-			return def, true
-		}
-	}
-	return schedulers.Definition{}, false
-}
-
-func (f *fakeRegistry) All() []schedulers.Definition {
-	out := make([]schedulers.Definition, len(f.ensured))
-	copy(out, f.ensured)
-	return out
+func (f *fakeExecutionService) BindRuntimeService(runtimecomp.Service) error {
+	return nil
 }
 
 func mustCycleController(t *testing.T, store metrix.CollectorStore) metrix.CycleController {
@@ -214,8 +160,15 @@ func assertMetricValue(t *testing.T, r metrix.Reader, name string, labels metrix
 	}
 }
 
+func assertMetricMissing(t *testing.T, r metrix.Reader, name string, labels metrix.Labels) {
+	t.Helper()
+	if _, ok := r.Value(name, labels); ok {
+		t.Fatalf("unexpected metric %s labels=%v", name, labels)
+	}
+}
+
 func TestCollector_CheckValidatesConfig(t *testing.T) {
-	coll := NewWithRegistry(newFakeRegistry())
+	coll := NewWithExecutionService(newFakeExecutionService())
 	coll.Config.JobConfig = spec.JobConfig{Name: "invalid-without-plugin"}
 	if err := coll.Check(context.Background()); err == nil {
 		t.Fatalf("expected check to fail for missing plugin")
@@ -228,7 +181,7 @@ func TestCollector_CheckValidatesConfig(t *testing.T) {
 }
 
 func TestCollector_DefaultTimingDefaultsFromSpec(t *testing.T) {
-	coll := NewWithRegistry(newFakeRegistry())
+	coll := NewWithExecutionService(newFakeExecutionService())
 	coll.Config.JobConfig = spec.JobConfig{
 		Name:   "defaults",
 		Plugin: "/bin/true",

@@ -17,7 +17,7 @@ func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 
 	warnLow := 100.0
 	warnHigh := 500.0
-	got := router.route("default", "job1", testPluginPath, []output.PerfDatum{
+	got := router.route("job1", testPluginPath, []output.PerfDatum{
 		{
 			Label: "latency",
 			Unit:  "ms",
@@ -58,7 +58,7 @@ func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 func TestPerfdataRouterCollisionPolicy(t *testing.T) {
 	router := newPerfdataRouter(64)
 
-	got := router.route("default", "job1", testPluginPath, []output.PerfDatum{
+	got := router.route("job1", testPluginPath, []output.PerfDatum{
 		{Label: "used-kb", Unit: "KB", Value: 2},
 		{Label: "used kb", Unit: "KB", Value: 1},
 	})
@@ -76,7 +76,7 @@ func TestPerfdataRouterCollisionPolicy(t *testing.T) {
 func TestPerfdataRouterBudgetPolicy(t *testing.T) {
 	router := newPerfdataRouter(2)
 
-	got := router.route("default", "job1", testPluginPath, []output.PerfDatum{
+	got := router.route("job1", testPluginPath, []output.PerfDatum{
 		{Label: "a", Unit: "c", Value: 1},
 		{Label: "b", Unit: "c", Value: 2},
 		{Label: "c", Unit: "c", Value: 3},
@@ -102,14 +102,14 @@ func TestPerfdataRouterBudgetPolicy(t *testing.T) {
 func TestPerfdataRouterUnitDriftPolicy(t *testing.T) {
 	router := newPerfdataRouter(64)
 
-	first := router.route("default", "job1", testPluginPath, []output.PerfDatum{
+	first := router.route("job1", testPluginPath, []output.PerfDatum{
 		{Label: "latency", Unit: "ms", Value: 10},
 	})
 	if len(first) == 0 {
 		t.Fatalf("expected first route to emit samples")
 	}
 
-	second := router.route("default", "job1", testPluginPath, []output.PerfDatum{
+	second := router.route("job1", testPluginPath, []output.PerfDatum{
 		{Label: "latency", Unit: "KB", Value: 10},
 	})
 	samples := sampleMap(second)
@@ -126,7 +126,7 @@ func TestPerfdataRouterUnitDriftPolicy(t *testing.T) {
 func TestPerfdataRouterInvalidSamples(t *testing.T) {
 	router := newPerfdataRouter(64)
 
-	_ = router.route("default", "job1", testPluginPath, []output.PerfDatum{
+	_ = router.route("job1", testPluginPath, []output.PerfDatum{
 		{Label: "", Unit: "ms", Value: 1},
 		{Label: "bad", Unit: "ms", Value: math.NaN()},
 	})

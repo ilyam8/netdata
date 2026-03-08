@@ -26,7 +26,6 @@ type SchedulerConfig struct {
 	Logger        *logger.Logger
 	Workers       int
 	QueueCapacity int
-	SchedulerName string
 	UserMacros    map[string]string
 	VnodeLookup   func(spec.JobSpec) VnodeInfo
 }
@@ -56,6 +55,7 @@ type Scheduler struct {
 	jobs   map[string]*jobState
 	jobMu  sync.RWMutex
 	jobSeq atomic.Uint64
+	regSeq atomic.Uint64
 
 	timerCh chan string
 
@@ -64,11 +64,10 @@ type Scheduler struct {
 
 	wg sync.WaitGroup
 
-	userMacros    map[string]string
-	vnodeLookup   func(spec.JobSpec) VnodeInfo
-	schedulerName string
-	rand          *rand.Rand
-	randMu        sync.Mutex
+	userMacros  map[string]string
+	vnodeLookup func(spec.JobSpec) VnodeInfo
+	rand        *rand.Rand
+	randMu      sync.Mutex
 
 	counters struct {
 		started  atomic.Uint64
@@ -117,9 +116,6 @@ func NewScheduler(cfg SchedulerConfig) (*Scheduler, error) {
 	if cfg.Workers <= 0 {
 		return nil, fmt.Errorf("scheduler workers must be > 0")
 	}
-	if cfg.SchedulerName == "" {
-		cfg.SchedulerName = "default"
-	}
 	userMacros := make(map[string]string, len(cfg.UserMacros))
 	for k, v := range cfg.UserMacros {
 		userMacros[strings.ToUpper(k)] = v
@@ -140,7 +136,6 @@ func NewScheduler(cfg SchedulerConfig) (*Scheduler, error) {
 		jobs:          make(map[string]*jobState),
 		userMacros:    userMacros,
 		vnodeLookup:   lookup,
-		schedulerName: cfg.SchedulerName,
 		rand:          rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	workFn := func(ctx context.Context, job JobRuntime) ExecutionResult {
@@ -180,9 +175,10 @@ func (s *Scheduler) RegisterJob(reg JobRegistration) (string, error) {
 		vnode = s.vnodeLookup(reg.Spec)
 	}
 	jr := JobRuntime{
-		ID:    jobID,
-		Spec:  reg.Spec,
-		Vnode: CloneVnodeInfo(vnode),
+		ID:         jobID,
+		Spec:       reg.Spec,
+		Vnode:      CloneVnodeInfo(vnode),
+		Generation: s.regSeq.Add(1),
 	}
 	var period *timeperiod.Period
 	if reg.Periods != nil {
@@ -236,6 +232,7 @@ func (s *Scheduler) UnregisterJob(jobID string) {
 	if !ok {
 		return
 	}
+	s.executor.Cancel(js.runtime)
 	if js.timer != nil {
 		js.timer.Stop()
 	}
@@ -345,6 +342,10 @@ func (s *Scheduler) handleTimer(jobID string) {
 }
 
 func (s *Scheduler) handleResult(res ExecutionResult) {
+	if !res.Executed {
+		return
+	}
+
 	parsed := output.Parse(res.Output)
 	if s.log != nil {
 		s.log.Debugf("nagios: parsed perfdata entries=%d for job=%s", len(parsed.Perfdata), res.Job.Spec.Name)
@@ -353,6 +354,10 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 
 	s.jobMu.Lock()
 	js, ok := s.jobs[res.Job.ID]
+	if ok && !sameRegistration(js.runtime, res.Job) {
+		ok = false
+		js = nil
+	}
 	var jobSpec spec.JobSpec
 	var snapshot JobSnapshot
 	var scheduleRetry bool
@@ -433,8 +438,13 @@ func (s *Scheduler) armTimer(js *jobState) {
 
 func (s *Scheduler) runJob(ctx context.Context, job JobRuntime) ExecutionResult {
 	res := ExecutionResult{Job: job, Start: time.Now()}
-	s.markRunning(job.ID, true)
-	defer s.markRunning(job.ID, false)
+	if _, ok := s.getJobState(job); !ok {
+		return res
+	}
+
+	res.Executed = true
+	s.markRunning(job, true)
+	defer s.markRunning(job, false)
 
 	timeout := job.Spec.Timeout
 	if timeout <= 0 {
@@ -446,7 +456,7 @@ func (s *Scheduler) runJob(ctx context.Context, job JobRuntime) ExecutionResult 
 	var usage ndexec.ResourceUsage
 	var err error
 
-	js, _ := s.getJobState(job.ID)
+	js, _ := s.getJobState(job)
 	runner := JobRunner(nil)
 	if js != nil {
 		runner = js.runner
@@ -487,8 +497,8 @@ func (s *Scheduler) runJob(ctx context.Context, job JobRuntime) ExecutionResult 
 
 func (s *Scheduler) buildMacroContext(job JobRuntime, js *jobState) MacroContext {
 	state := StateInfo{
-		ServiceState:       s.currentState(job.ID),
-		ServiceAttempt:     s.currentAttempt(job.ID),
+		ServiceState:       s.currentState(job),
+		ServiceAttempt:     s.currentAttempt(job),
 		ServiceMaxAttempts: maxInt(job.Spec.MaxCheckAttempts, 1),
 		HostState:          "UP",
 		HostStateID:        "0",
@@ -510,19 +520,22 @@ func (s *Scheduler) buildMacroContext(job JobRuntime, js *jobState) MacroContext
 	}
 }
 
-func (s *Scheduler) markRunning(jobID string, running bool) {
+func (s *Scheduler) markRunning(job JobRuntime, running bool) {
 	s.jobMu.Lock()
-	if js, ok := s.jobs[jobID]; ok {
+	if js, ok := s.jobs[job.ID]; ok && sameRegistration(js.runtime, job) {
 		js.running = running
 	}
 	s.jobMu.Unlock()
 }
 
-func (s *Scheduler) getJobState(jobID string) (*jobState, bool) {
+func (s *Scheduler) getJobState(job JobRuntime) (*jobState, bool) {
 	s.jobMu.RLock()
 	defer s.jobMu.RUnlock()
-	js, ok := s.jobs[jobID]
-	return js, ok
+	js, ok := s.jobs[job.ID]
+	if !ok || !sameRegistration(js.runtime, job) {
+		return nil, false
+	}
+	return js, true
 }
 
 func buildJobID(sp spec.JobSpec, idx int) string {
@@ -537,7 +550,6 @@ func buildJobID(sp spec.JobSpec, idx int) string {
 func (s *Scheduler) Snapshot() SchedulerSnapshot {
 	stats := s.executor.Stats()
 	snapshot := SchedulerSnapshot{
-		Scheduler: s.schedulerName,
 		Running:   int64(stats.Executing),
 		Queued:    int64(stats.QueueDepth),
 		Scheduled: int64(s.scheduledCount()),
@@ -598,13 +610,6 @@ func (s *Scheduler) nextRunDelay() time.Duration {
 		}
 	}
 	return min
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }
 
 func (s *Scheduler) scheduledCount() int {
@@ -712,19 +717,23 @@ func normalizeState(state string) string {
 	}
 }
 
-func (s *Scheduler) currentState(jobID string) string {
+func sameRegistration(current, actual JobRuntime) bool {
+	return current.ID == actual.ID && current.Generation == actual.Generation
+}
+
+func (s *Scheduler) currentState(job JobRuntime) string {
 	s.jobMu.RLock()
 	defer s.jobMu.RUnlock()
-	if js, ok := s.jobs[jobID]; ok && js.state != "" {
+	if js, ok := s.jobs[job.ID]; ok && sameRegistration(js.runtime, job) && js.state != "" {
 		return js.state
 	}
 	return "UNKNOWN"
 }
 
-func (s *Scheduler) currentAttempt(jobID string) int {
+func (s *Scheduler) currentAttempt(job JobRuntime) int {
 	s.jobMu.RLock()
 	defer s.jobMu.RUnlock()
-	if js, ok := s.jobs[jobID]; ok {
+	if js, ok := s.jobs[job.ID]; ok && sameRegistration(js.runtime, job) {
 		return js.currentAttempt()
 	}
 	return 1

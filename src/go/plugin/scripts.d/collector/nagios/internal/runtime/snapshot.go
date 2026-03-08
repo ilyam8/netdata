@@ -10,8 +10,6 @@ import (
 
 // SchedulerSnapshot is a typed scheduler state snapshot used by v2 collectors.
 type SchedulerSnapshot struct {
-	Scheduler string
-
 	Running   int64
 	Queued    int64
 	Scheduled int64

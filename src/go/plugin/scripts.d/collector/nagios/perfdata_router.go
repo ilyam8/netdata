@@ -41,7 +41,6 @@ type perfMetricSample struct {
 }
 
 type perfMetricBindingKey struct {
-	scheduler string
 	job       string
 	source    string
 	metricKey string
@@ -75,7 +74,7 @@ func newPerfdataRouter(maxPerJob int) *perfdataRouter {
 	}
 }
 
-func (r *perfdataRouter) route(scheduler, job, pluginPath string, perf []output.PerfDatum) []perfMetricSample {
+func (r *perfdataRouter) route(job, pluginPath string, perf []output.PerfDatum) []perfMetricSample {
 	if len(perf) == 0 {
 		return nil
 	}
@@ -128,7 +127,6 @@ func (r *perfdataRouter) route(scheduler, job, pluginPath string, perf []output.
 	samples := make([]perfMetricSample, 0, len(deduped)*16)
 	for _, item := range deduped {
 		binding := perfMetricBindingKey{
-			scheduler: scheduler,
 			job:       job,
 			source:    source,
 			metricKey: item.metricKey,

@@ -6,9 +6,6 @@
     "name": {
       "type": "string"
     },
-    "scheduler": {
-      "type": "string"
-    },
     "vnode": {
       "type": "string"
     },
@@ -143,14 +140,6 @@
         ],
         "additionalProperties": true
       }
-    },
-    "workers": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "queue_size": {
-      "type": "integer",
-      "minimum": 1
     }
   },
   "required": [

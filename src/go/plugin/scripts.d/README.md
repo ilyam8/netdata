@@ -2,9 +2,9 @@
 
 `scripts.d.plugin` runs Nagios-style check scripts inside Netdata without changing
 plugin output format. The active collector is `nagios` (single collector surface),
-executed through a shared named scheduler runtime.
+executed through one shared internal async execution service.
 
-> **Status:** preview. Core execution, perfdata routing, and scheduler telemetry are
+> **Status:** preview. Core execution, perfdata routing, and internal execution telemetry are
 > implemented; config/docs may still evolve.
 
 ## Configuration
@@ -19,7 +19,6 @@ Example:
 ```yaml
 jobs:
   - name: ping_localhost
-    scheduler: default
     plugin: "/usr/lib/nagios/plugins/check_ping"
     args: ["-H", "127.0.0.1", "-w", "100.0,20%", "-c", "200.0,40%"]
     timeout: 60s
@@ -49,11 +48,14 @@ jobs:
     check_period: 24x7
 ```
 
-## Scheduler Model
+## Execution Model
 
-- Jobs with the same `scheduler` name share one worker pool.
-- Runtime snapshot is exported every `update_every` (default: `10s`).
+- Jobs share one internal execution service.
 - Job execution cadence is independent (`check_interval` / `retry_interval`).
+- Worker/queue sizing is internal in the current preview design; there is no public
+  scheduler tuning surface.
+- Public collector metrics are emitted every `update_every` (default: `10s`).
+- Internal execution runtime telemetry is producer-driven on the runtime service cadence.
 
 Defaults:
 
@@ -61,8 +63,6 @@ Defaults:
 - `retry_interval`: `1m`
 - `timeout`: `60s`
 - `max_check_attempts`: `3`
-- `scheduler` workers: `50`
-- `scheduler` queue_size: `128`
 
 ## Metrics and Charts
 
@@ -70,8 +70,6 @@ Static template charts:
 
 - `nagios.job_state`
 - `nagios.job_attempts`
-- `nagios.scheduler_jobs`
-- `nagios.scheduler_totals`
 
 Perfdata is routed plugin-side and materialized via autogen (bounded lifecycle):
 
@@ -79,6 +77,11 @@ Perfdata is routed plugin-side and materialized via autogen (bounded lifecycle):
 - Metric identity: sanitized perfdata key (from Nagios perfdata label)
 - Unit drift policy: drop sample when a key changes unit class
 - Collision policy: deterministic keep-first, drop conflicting label
+
+## Runtime Telemetry
+
+Execution runtime telemetry is emitted through the internal `runtimecomp` seam. It is
+not exposed as public Nagios scheduler charts.
 
 ## Logging
 
@@ -91,7 +94,7 @@ config yet.
 ```bash
 cd src/go
 go test ./plugin/scripts.d/collector/nagios -count=1
-go test ./plugin/scripts.d/collector/nagios/internal/schedulers -count=1
+go test ./plugin/scripts.d/collector/nagios/internal/execution -count=1
 go test ./plugin/scripts.d/collector/nagios/internal/runtime -count=1
 ```
 

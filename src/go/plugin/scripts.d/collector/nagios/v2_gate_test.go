@@ -39,7 +39,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	warnHigh := 500.0
 	critLow := 200.0
 	critHigh := 900.0
-	samples := router.route("default", "gate_job", gatePluginPath, []output.PerfDatum{
+	samples := router.route("gate_job", gatePluginPath, []output.PerfDatum{
 		{
 			Label: "latency", Unit: "ms", Value: 120,
 			Warn: &output.ThresholdRange{Inclusive: true, Low: &warnLow, High: &warnHigh},
@@ -80,7 +80,6 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	cc.BeginCycle()
 	sm := store.Write().SnapshotMeter("nagios")
 	labels := sm.LabelSet(
-		metrix.Label{Key: "nagios_scheduler", Value: "default"},
 		metrix.Label{Key: "nagios_job", Value: "gate_job"},
 	)
 	for _, measureSet := range buildPerfMeasureSets(samples) {
@@ -109,7 +108,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	assertMetricChartFamily(t, reader, "nagios.check_gate.time_latency_value", "check_gate")
 	assertMetricChartFamily(t, reader, "nagios.check_gate.time_latency_warn_low", "check_gate")
 
-	_ = router.route("default", "gate_job", gatePluginPath, []output.PerfDatum{
+	_ = router.route("gate_job", gatePluginPath, []output.PerfDatum{
 		{Label: "latency", Unit: "%", Value: 1}, // unit drift: time -> percent
 	})
 	counters := router.dropCounters()
@@ -144,7 +143,6 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 			cc.BeginCycle()
 			sm := store.Write().SnapshotMeter("nagios")
 			ls := sm.LabelSet(
-				metrix.Label{Key: "nagios_scheduler", Value: "default"},
 				metrix.Label{Key: "nagios_job", Value: "gate_job"},
 			)
 			aFields := defaultPerfMeasureSetValues()
@@ -188,7 +186,6 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		cc.BeginCycle()
 		sm := store.Write().SnapshotMeter("nagios")
 		ls := sm.LabelSet(
-			metrix.Label{Key: "nagios_scheduler", Value: "default"},
 			metrix.Label{Key: "nagios_job", Value: "gate_job"},
 		)
 		aFields := defaultPerfMeasureSetValues()
@@ -231,7 +228,6 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		cc.BeginCycle()
 		sm := store.Write().SnapshotMeter("nagios")
 		ls := sm.LabelSet(
-			metrix.Label{Key: "nagios_scheduler", Value: "default"},
 			metrix.Label{Key: "nagios_job", Value: "gate_job"},
 		)
 		aFields := defaultPerfMeasureSetValues()
@@ -283,7 +279,7 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 			router := newPerfdataRouter(64)
 			displayV1 := legacyDisplayValue(tc.unit, tc.raw)
 
-			samples := router.route("default", "gate_job", gatePluginPath, []output.PerfDatum{
+			samples := router.route("gate_job", gatePluginPath, []output.PerfDatum{
 				{Label: "sample", Unit: tc.unit, Value: tc.raw},
 			})
 			var (
@@ -452,7 +448,7 @@ func assertPlanHasNoRemoveForTarget(t *testing.T, plan chartengine.Plan, removeM
 }
 
 func TestV2Gate_SmokeCollect(t *testing.T) {
-	coll := NewWithRegistry(newFakeRegistry())
+	coll := NewWithExecutionService(newFakeExecutionService())
 	coll.Config.JobConfig.Plugin = "/bin/true"
 	coll.Config.JobConfig.Name = "smoke"
 	if err := coll.Check(context.Background()); err != nil {

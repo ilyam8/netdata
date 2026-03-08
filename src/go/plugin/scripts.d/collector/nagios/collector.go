@@ -9,8 +9,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/execution"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/runtime"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/schedulers"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
 )
@@ -22,64 +23,65 @@ var configSchema string
 var nagiosChartTemplateV2 string
 
 func init() {
-	sharedRegistry := schedulers.NewRegistry()
 	collectorapi.Register("nagios", collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		CreateV2: func() collectorapi.CollectorV2 { return NewWithRegistry(sharedRegistry) },
+		CreateV2: func() collectorapi.CollectorV2 { return NewWithExecutionService(sharedExecutionService) },
 		Config:   func() any { return &Config{} },
 	})
 }
 
-// Config is the initial v2 skeleton config surface.
+var sharedExecutionService = mustSharedExecutionService()
+
+func mustSharedExecutionService() execution.ExecutionService {
+	svc, err := execution.NewExecutionService(execution.ExecutionServiceConfig{})
+	if err != nil {
+		panic(err)
+	}
+	return svc
+}
+
+// Config is the public v2 config surface.
 type Config struct {
 	spec.JobConfig `yaml:",inline" json:",inline"`
 	TimePeriods    []timeperiod.Config `yaml:"time_periods,omitempty" json:"time_periods,omitempty"`
-	Workers        int                 `yaml:"workers,omitempty" json:"workers"`
-	QueueSize      int                 `yaml:"queue_size,omitempty" json:"queue_size"`
 }
 
-// Collector is a v2 skeleton collector used as migration scaffold.
+// Collector is the v2 Nagios collector.
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:",inline"`
 
-	store    metrix.CollectorStore
-	registry schedulers.SchedulerRegistry
-	router   *perfdataRouter
+	store   metrix.CollectorStore
+	service execution.ExecutionService
+	router  *perfdataRouter
 
 	jobSpec   spec.JobSpec
 	periods   *timeperiod.Set
-	jobHandle *schedulers.SchedulerJobHandle
+	jobHandle *execution.JobHandle
 }
 
 func New() *Collector {
-	return NewWithRegistry(nil)
+	return NewWithExecutionService(sharedExecutionService)
 }
 
-func NewWithRegistry(reg schedulers.SchedulerRegistry) *Collector {
-	if reg == nil {
-		reg = schedulers.NewRegistry()
+func NewWithExecutionService(service execution.ExecutionService) *Collector {
+	if service == nil {
+		panic("nagios: execution service must not be nil")
 	}
 	return &Collector{
-		Config: Config{
-			JobConfig: spec.JobConfig{
-				Scheduler: "default",
-			},
-			Workers:   50,
-			QueueSize: 128,
-		},
-		store:    metrix.NewCollectorStore(),
-		registry: reg,
-		router:   newPerfdataRouter(defaultPerfdataMetricKeyBudget),
+		Config:  Config{},
+		store:   metrix.NewCollectorStore(),
+		service: service,
+		router:  newPerfdataRouter(defaultPerfdataMetricKeyBudget),
 	}
 }
 
 func (c *Collector) Configuration() any { return c.Config }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.compileTimePeriods(); err != nil {
 		return err
 	}
@@ -89,21 +91,13 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.jobSpec = sp
 
-	def := schedulers.Definition{
-		Name:      c.jobSpec.Scheduler,
-		Workers:   c.Workers,
-		QueueSize: c.QueueSize,
-		Builtin:   c.jobSpec.Scheduler == "default",
-	}
-	if err := c.registry.Ensure(def, c.Logger); err != nil {
-		return err
-	}
+	c.bindRuntimeService(ctx)
 
-	handle, err := c.registry.Attach(c.jobSpec.Scheduler, runtime.JobRegistration{
+	handle, err := c.service.Attach(execution.Registration{
 		Spec:    c.jobSpec,
 		Emitter: runtime.NewLogEmitter(c.Logger),
 		Periods: c.periods,
-	}, c.Logger)
+	})
 	if err != nil {
 		return err
 	}
@@ -117,48 +111,34 @@ func (c *Collector) Check(context.Context) error {
 }
 
 func (c *Collector) Collect(context.Context) error {
-	snapshot, ok := c.registry.Snapshot(c.jobSpec.Scheduler)
-	if !ok {
+	if c.service == nil || c.jobHandle == nil {
 		return nil
 	}
 
+	snapshot := c.service.Snapshot()
 	sm := c.store.Write().SnapshotMeter("nagios")
-	lbl := sm.LabelSet(metrix.Label{Key: "nagios_scheduler", Value: c.jobSpec.Scheduler})
-
-	observe := func(name string, value float64) {
-		sm.Gauge(name).Observe(value, lbl)
-	}
-	jobStateSet := sm.Vec("nagios_scheduler", "nagios_job").StateSet(
+	jobStateSet := sm.Vec("nagios_job").StateSet(
 		"job.state",
 		metrix.WithStateSetMode(metrix.ModeEnum),
 		metrix.WithStateSetStates("ok", "warning", "critical", "unknown"),
 		metrix.WithUnit("state"),
 	)
-	observe("scheduler.running", float64(snapshot.Running))
-	observe("scheduler.queued", float64(snapshot.Queued))
-	observe("scheduler.scheduled", float64(snapshot.Scheduled))
-	sm.Counter("scheduler.started").ObserveTotal(float64(snapshot.Started), lbl)
-	sm.Counter("scheduler.finished").ObserveTotal(float64(snapshot.Finished), lbl)
-	sm.Counter("scheduler.skipped").ObserveTotal(float64(snapshot.Skipped), lbl)
 
 	for _, job := range snapshot.Jobs {
-		if c.jobHandle != nil && job.JobID != c.jobHandle.JobID() {
+		if job.JobID != c.jobHandle.JobID() {
 			continue
 		}
 
-		jobLbl := sm.LabelSet(
-			metrix.Label{Key: "nagios_scheduler", Value: c.jobSpec.Scheduler},
-			metrix.Label{Key: "nagios_job", Value: job.JobName},
-		)
+		jobLbl := sm.LabelSet(metrix.Label{Key: "nagios_job", Value: job.JobName})
 		observeJob := func(name string, value float64) {
 			sm.Gauge(name).Observe(value, jobLbl)
 		}
 
-		jobStateSet.WithLabelValues(c.jobSpec.Scheduler, job.JobName).Enable(normalizeJobStateForMetric(job.State))
+		jobStateSet.WithLabelValues(job.JobName).Enable(normalizeJobStateForMetric(job.State))
 		observeJob("job.attempt", float64(job.Attempt))
 		observeJob("job.max_attempts", float64(job.MaxAttempt))
 
-		perf := c.router.route(c.jobSpec.Scheduler, job.JobName, c.jobSpec.Plugin, job.PerfSamples)
+		perf := c.router.route(job.JobName, c.jobSpec.Plugin, job.PerfSamples)
 		for _, measureSet := range buildPerfMeasureSets(perf) {
 			sm.MeasureSetGauge(
 				measureSet.name,
@@ -169,29 +149,20 @@ func (c *Collector) Collect(context.Context) error {
 		}
 	}
 
+	counterLbl := sm.LabelSet(metrix.Label{Key: "nagios_job", Value: c.jobSpec.Name})
 	counters := c.router.dropCounters()
-	sm.Counter("perfdata_dropped_invalid_total").ObserveTotal(float64(counters.Invalid), lbl)
-	sm.Counter("perfdata_dropped_collision_total").ObserveTotal(float64(counters.Collision), lbl)
-	sm.Counter("perfdata_dropped_unit_drift_total").ObserveTotal(float64(counters.UnitDrift), lbl)
-	sm.Counter("perfdata_dropped_budget_total").ObserveTotal(float64(counters.Budget), lbl)
+	sm.Counter("perfdata_dropped_invalid_total").ObserveTotal(float64(counters.Invalid), counterLbl)
+	sm.Counter("perfdata_dropped_collision_total").ObserveTotal(float64(counters.Collision), counterLbl)
+	sm.Counter("perfdata_dropped_unit_drift_total").ObserveTotal(float64(counters.UnitDrift), counterLbl)
+	sm.Counter("perfdata_dropped_budget_total").ObserveTotal(float64(counters.Budget), counterLbl)
 
 	return nil
 }
 
 func (c *Collector) Cleanup(context.Context) {
-	if c.registry == nil {
-		return
-	}
-	if c.jobHandle != nil {
-		c.registry.Detach(c.jobHandle)
+	if c.service != nil && c.jobHandle != nil {
+		c.service.Detach(c.jobHandle)
 		c.jobHandle = nil
-	}
-	scheduler := c.jobSpec.Scheduler
-	if scheduler == "" {
-		scheduler = "default"
-	}
-	if err := c.registry.Remove(scheduler); err != nil {
-		c.Warningf("scheduler cleanup remove %q: %v", scheduler, err)
 	}
 }
 
@@ -227,4 +198,17 @@ func (c *Collector) compileTimePeriods() error {
 	}
 	c.periods = set
 	return nil
+}
+
+func (c *Collector) bindRuntimeService(ctx context.Context) {
+	if ctx == nil || c.service == nil {
+		return
+	}
+	runtimeService, ok := runtimecomp.ServiceFromContext(ctx)
+	if !ok {
+		return
+	}
+	if err := c.service.BindRuntimeService(runtimeService); err != nil {
+		c.Warningf("execution runtime telemetry registration failed: %v", err)
+	}
 }

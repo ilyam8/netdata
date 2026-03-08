@@ -20,7 +20,6 @@ import (
 )
 
 const (
-	testScheduler  = "mock-scheduler"
 	mockPluginDir  = "plugins"
 	schedulerStart = 100 * time.Millisecond
 )
@@ -187,7 +186,6 @@ func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Sched
 	}
 	sched, err := runtimepkg.NewScheduler(runtimepkg.SchedulerConfig{
 		Workers:       workers,
-		SchedulerName: testScheduler,
 		UserMacros:    map[string]string{"USER1": "/usr/lib/nagios/plugins"},
 		VnodeLookup:   vnodeLookup,
 	})
