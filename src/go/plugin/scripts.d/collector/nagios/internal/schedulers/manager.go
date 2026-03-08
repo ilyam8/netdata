@@ -13,13 +13,11 @@ import (
 
 // Definition describes a configured scheduler instance.
 type Definition struct {
-	Name           string
-	Workers        int
-	QueueSize      int
-	Labels         map[string]string
-	LoggingEnabled bool
-	Logging        runtime.OTLPEmitterConfig
-	Builtin        bool
+	Name      string
+	Workers   int
+	QueueSize int
+	Labels    map[string]string
+	Builtin   bool
 }
 
 type manager struct {
@@ -32,18 +30,11 @@ var defaultManager = newManager()
 
 func defaultDefinition() Definition {
 	return Definition{
-		Name:           "default",
-		Workers:        50,
-		QueueSize:      128,
-		Labels:         nil,
-		LoggingEnabled: true,
-		Logging: runtime.OTLPEmitterConfig{
-			Endpoint: runtime.DefaultOTLPEndpoint,
-			Timeout:  runtime.DefaultOTLPTimeout,
-			UseTLS:   false,
-			Headers:  map[string]string{},
-		},
-		Builtin: true,
+		Name:      "default",
+		Workers:   50,
+		QueueSize: 128,
+		Labels:    nil,
+		Builtin:   true,
 	}
 }
 
@@ -216,11 +207,6 @@ func normalizeDefinition(def Definition) Definition {
 	}
 	if def.QueueSize <= 0 {
 		def.QueueSize = 128
-	}
-	if def.Logging.Headers == nil {
-		def.Logging.Headers = make(map[string]string)
-	} else {
-		def.Logging.Headers = maps.Clone(def.Logging.Headers)
 	}
 	if def.Labels != nil {
 		def.Labels = maps.Clone(def.Labels)

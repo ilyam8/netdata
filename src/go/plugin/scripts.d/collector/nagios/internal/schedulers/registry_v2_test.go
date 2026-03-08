@@ -120,14 +120,6 @@ func TestRegistryEnsureRejectsIncompatibleRuntimeFields(t *testing.T) {
 			d.QueueSize++
 			return d
 		},
-		"logging enabled change": func(d Definition) Definition {
-			d.LoggingEnabled = !d.LoggingEnabled
-			return d
-		},
-		"logging config change": func(d Definition) Definition {
-			d.Logging.Endpoint = d.Logging.Endpoint + "/changed"
-			return d
-		},
 		"builtin flag change": func(d Definition) Definition {
 			d.Builtin = !d.Builtin
 			return d
@@ -135,17 +127,10 @@ func TestRegistryEnsureRejectsIncompatibleRuntimeFields(t *testing.T) {
 	}
 
 	base := Definition{
-		Name:           "compat",
-		Workers:        5,
-		QueueSize:      10,
-		LoggingEnabled: true,
-		Logging: runtime.OTLPEmitterConfig{
-			Endpoint: "http://otel:4317",
-			Timeout:  time.Second,
-			UseTLS:   false,
-			Headers:  map[string]string{"x": "y"},
-		},
-		Builtin: false,
+		Name:      "compat",
+		Workers:   5,
+		QueueSize: 10,
+		Builtin:   false,
 	}
 
 	for name, mutate := range tests {
@@ -192,16 +177,9 @@ func TestRegistryEnsureFailureKeepsOldHostAndJobs(t *testing.T) {
 	reg := newRegistryWithFactory(factory)
 
 	def := Definition{
-		Name:           "keep",
-		Workers:        2,
-		QueueSize:      4,
-		LoggingEnabled: true,
-		Logging: runtime.OTLPEmitterConfig{
-			Endpoint: "http://otel:4317",
-			Timeout:  time.Second,
-			UseTLS:   false,
-			Headers:  map[string]string{},
-		},
+		Name:      "keep",
+		Workers:   2,
+		QueueSize: 4,
 	}
 	if err := reg.Ensure(def, nil); err != nil {
 		t.Fatalf("ensure failed: %v", err)
@@ -234,16 +212,9 @@ func TestRegistryEnsureFailureKeepsOldHostAndJobs(t *testing.T) {
 func TestRegistryDetachIgnoresStaleGenerationHandle(t *testing.T) {
 	reg := newRegistryWithFactory(&fakeHostFactory{})
 	def := Definition{
-		Name:           "stale",
-		Workers:        2,
-		QueueSize:      4,
-		LoggingEnabled: true,
-		Logging: runtime.OTLPEmitterConfig{
-			Endpoint: "http://otel:4317",
-			Timeout:  time.Second,
-			UseTLS:   false,
-			Headers:  map[string]string{},
-		},
+		Name:      "stale",
+		Workers:   2,
+		QueueSize: 4,
 	}
 	if err := reg.Ensure(def, nil); err != nil {
 		t.Fatalf("ensure failed: %v", err)
@@ -283,16 +254,9 @@ func TestRegistryDetachIgnoresStaleGenerationHandle(t *testing.T) {
 func TestRegistryEnsureNoopKeepsHandleGenerationStable(t *testing.T) {
 	reg := newRegistryWithFactory(&fakeHostFactory{})
 	def := Definition{
-		Name:           "noop",
-		Workers:        2,
-		QueueSize:      4,
-		LoggingEnabled: true,
-		Logging: runtime.OTLPEmitterConfig{
-			Endpoint: "http://otel:4317",
-			Timeout:  time.Second,
-			UseTLS:   false,
-			Headers:  map[string]string{},
-		},
+		Name:      "noop",
+		Workers:   2,
+		QueueSize: 4,
 	}
 	if err := reg.Ensure(def, nil); err != nil {
 		t.Fatalf("ensure failed: %v", err)

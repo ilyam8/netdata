@@ -90,17 +90,10 @@ func (c *Collector) Init(context.Context) error {
 	c.jobSpec = sp
 
 	def := schedulers.Definition{
-		Name:           c.jobSpec.Scheduler,
-		Workers:        c.Workers,
-		QueueSize:      c.QueueSize,
-		Builtin:        c.jobSpec.Scheduler == "default",
-		LoggingEnabled: true,
-		Logging: runtime.OTLPEmitterConfig{
-			Endpoint: runtime.DefaultOTLPEndpoint,
-			Timeout:  runtime.DefaultOTLPTimeout,
-			UseTLS:   false,
-			Headers:  map[string]string{},
-		},
+		Name:      c.jobSpec.Scheduler,
+		Workers:   c.Workers,
+		QueueSize: c.QueueSize,
+		Builtin:   c.jobSpec.Scheduler == "default",
 	}
 	if err := c.registry.Ensure(def, c.Logger); err != nil {
 		return err

@@ -288,7 +288,5 @@ func definitionsCompatible(a, b Definition) bool {
 	return a.Name == b.Name &&
 		a.Workers == b.Workers &&
 		a.QueueSize == b.QueueSize &&
-		a.LoggingEnabled == b.LoggingEnabled &&
-		a.Builtin == b.Builtin &&
-		reflect.DeepEqual(normalizeDefinition(a).Logging, normalizeDefinition(b).Logging)
+		a.Builtin == b.Builtin
 }

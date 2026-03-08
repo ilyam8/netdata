@@ -15,11 +15,9 @@ func TestV2Gate_G4_SchedulerRegistry(t *testing.T) {
 	t.Run("concurrent attach/detach with compatible ensure", func(t *testing.T) {
 		reg := newRegistryWithFactory(&fakeHostFactory{})
 		def := Definition{
-			Name:           "gate-concurrent",
-			Workers:        4,
-			QueueSize:      16,
-			LoggingEnabled: true,
-			Logging:        defaultDefinition().Logging,
+			Name:      "gate-concurrent",
+			Workers:   4,
+			QueueSize: 16,
 		}
 		if err := reg.Ensure(def, nil); err != nil {
 			t.Fatalf("ensure failed: %v", err)
