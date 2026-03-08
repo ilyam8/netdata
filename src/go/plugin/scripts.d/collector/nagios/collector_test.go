@@ -89,13 +89,23 @@ func TestCollector_InitCollectCleanup(t *testing.T) {
 	flat := coll.MetricStore().Read(metrix.ReadFlatten())
 	assertMetricValue(t, read, "nagios.scheduler.running", metrix.Labels{"nagios_scheduler": "default"}, 1)
 	assertMetricValue(t, flat, "nagios.job.state", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk", "nagios.job.state": "ok"}, 1)
-	assertMetricValue(t, read, "nagios.perf_bytes_used_value", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"}, 30000)
-	meta, ok := read.MetricMeta("nagios.perf_bytes_used_value")
+	assertMetricValue(t, flat, "nagios.true.bytes_used_value", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
+	point, ok := read.MeasureSet("nagios.true.bytes_used", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"})
 	if !ok {
-		t.Fatalf("expected metric metadata for nagios.perf_bytes_used_value")
+		t.Fatalf("expected raw measureset for nagios.true.bytes_used")
+	}
+	if got := point.Values[0]; got != 30000 {
+		t.Fatalf("unexpected raw measureset value: got=%f want=%f", got, float64(30000))
+	}
+	meta, ok := flat.MetricMeta("nagios.true.bytes_used_value")
+	if !ok {
+		t.Fatalf("expected metric metadata for nagios.true.bytes_used_value")
 	}
 	if meta.Unit != "bytes" {
 		t.Fatalf("unexpected unit metadata: %q", meta.Unit)
+	}
+	if meta.ChartFamily != "true" {
+		t.Fatalf("unexpected chart family metadata: %q", meta.ChartFamily)
 	}
 	if !meta.Float {
 		t.Fatalf("expected float metadata to be true")

@@ -15,6 +15,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
 )
 
+const gatePluginPath = "/opt/nagios-scripts/check_gate.pl"
+
 func TestV2Gate_G1_TemplateCompileProof(t *testing.T) {
 	templateYAML := New().ChartTemplateYAML()
 	collecttest.AssertChartTemplateSchema(t, templateYAML)
@@ -37,7 +39,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	warnHigh := 500.0
 	critLow := 200.0
 	critHigh := 900.0
-	samples := router.route("default", "gate_job", []output.PerfDatum{
+	samples := router.route("default", "gate_job", gatePluginPath, []output.PerfDatum{
 		{
 			Label: "latency", Unit: "ms", Value: 120,
 			Warn: &output.ThresholdRange{Inclusive: true, Low: &warnLow, High: &warnHigh},
@@ -54,24 +56,24 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 
 	byName := sampleMap(samples)
 	byUnit := sampleUnits(samples)
-	assertNear(t, byName["perf_time_latency_value"], 0.12)
-	assertNear(t, byName["perf_bytes_throughput_value"], 30000)
-	assertNear(t, byName["perf_bits_wire_rate_value"], 80000)
-	assertNear(t, byName["perf_percent_free_pct_value"], 40)
-	assertNear(t, byName["perf_counter_requests_value"], 42)
-	assertNear(t, byName["perf_generic_custom_value"], 3.14)
-	assertNear(t, byName["perf_time_latency_warn_low"], 0.1)
-	assertNear(t, byName["perf_time_latency_warn_high"], 0.5)
-	assertNear(t, byName["perf_time_latency_crit_low"], 0.2)
-	assertNear(t, byName["perf_time_latency_crit_high"], 0.9)
-	assertNear(t, byName["perf_generic_dup_one_value"], 11)
+	assertNear(t, byName["check_gate.time_latency_value"], 0.12)
+	assertNear(t, byName["check_gate.bytes_throughput_value"], 30000)
+	assertNear(t, byName["check_gate.bits_wire_rate_value"], 80000)
+	assertNear(t, byName["check_gate.percent_free_pct_value"], 40)
+	assertNear(t, byName["check_gate.counter_requests_value"], 42)
+	assertNear(t, byName["check_gate.generic_custom_value"], 3.14)
+	assertNear(t, byName["check_gate.time_latency_warn_low"], 0.1)
+	assertNear(t, byName["check_gate.time_latency_warn_high"], 0.5)
+	assertNear(t, byName["check_gate.time_latency_crit_low"], 0.2)
+	assertNear(t, byName["check_gate.time_latency_crit_high"], 0.9)
+	assertNear(t, byName["check_gate.generic_dup_one_value"], 11)
 
-	assertString(t, byUnit["perf_time_latency_value"], "seconds")
-	assertString(t, byUnit["perf_bytes_throughput_value"], "bytes")
-	assertString(t, byUnit["perf_bits_wire_rate_value"], "bits")
-	assertString(t, byUnit["perf_percent_free_pct_value"], "%")
-	assertString(t, byUnit["perf_counter_requests_value"], "c")
-	assertString(t, byUnit["perf_generic_custom_value"], "generic")
+	assertString(t, byUnit["check_gate.time_latency_value"], "seconds")
+	assertString(t, byUnit["check_gate.bytes_throughput_value"], "bytes")
+	assertString(t, byUnit["check_gate.bits_wire_rate_value"], "bits")
+	assertString(t, byUnit["check_gate.percent_free_pct_value"], "%")
+	assertString(t, byUnit["check_gate.counter_requests_value"], "c")
+	assertString(t, byUnit["check_gate.generic_custom_value"], "generic")
 
 	store := metrix.NewCollectorStore()
 	cc := gateCycleController(t, store)
@@ -81,26 +83,33 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 		metrix.Label{Key: "nagios_scheduler", Value: "default"},
 		metrix.Label{Key: "nagios_job", Value: "gate_job"},
 	)
-	for _, sample := range samples {
-		sm.Gauge(sample.name, metrix.WithUnit(sample.unit), metrix.WithFloat(sample.float)).Observe(sample.value, labels)
+	for _, measureSet := range buildPerfMeasureSets(samples) {
+		sm.MeasureSetGauge(
+			measureSet.name,
+			metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+			metrix.WithChartFamily(measureSet.scriptName),
+			metrix.WithUnit(measureSet.unit),
+		).ObserveFields(measureSet.values, labels)
 	}
 	cc.CommitCycleSuccess()
 
-	reader := store.Read(metrix.ReadRaw())
-	assertMetricMeta(t, reader, "nagios.perf_time_latency_value", "seconds", true)
-	assertMetricMeta(t, reader, "nagios.perf_bytes_throughput_value", "bytes", true)
-	assertMetricMeta(t, reader, "nagios.perf_bits_wire_rate_value", "bits", true)
-	assertMetricMeta(t, reader, "nagios.perf_percent_free_pct_value", "%", true)
-	assertMetricMeta(t, reader, "nagios.perf_counter_requests_value", "c", true)
-	assertMetricMeta(t, reader, "nagios.perf_generic_custom_value", "generic", true)
-	assertMetricMeta(t, reader, "nagios.perf_time_latency_warn_low", "seconds", true)
-	assertMetricMeta(t, reader, "nagios.perf_time_latency_warn_high", "seconds", true)
-	assertMetricMeta(t, reader, "nagios.perf_time_latency_warn_defined", "state", false)
-	assertMetricMeta(t, reader, "nagios.perf_time_latency_crit_low", "seconds", true)
-	assertMetricMeta(t, reader, "nagios.perf_time_latency_crit_high", "seconds", true)
-	assertMetricMeta(t, reader, "nagios.perf_time_latency_crit_defined", "state", false)
+	reader := store.Read(metrix.ReadFlatten())
+	assertMetricMeta(t, reader, "nagios.check_gate.time_latency_value", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.bytes_throughput_value", "bytes", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.bits_wire_rate_value", "bits", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.percent_free_pct_value", "%", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.counter_requests_value", "c", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.generic_custom_value", "generic", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.time_latency_warn_low", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.time_latency_warn_high", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.time_latency_warn_defined", "seconds", false)
+	assertMetricMeta(t, reader, "nagios.check_gate.time_latency_crit_low", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.time_latency_crit_high", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.check_gate.time_latency_crit_defined", "seconds", false)
+	assertMetricChartFamily(t, reader, "nagios.check_gate.time_latency_value", "check_gate")
+	assertMetricChartFamily(t, reader, "nagios.check_gate.time_latency_warn_low", "check_gate")
 
-	_ = router.route("default", "gate_job", []output.PerfDatum{
+	_ = router.route("default", "gate_job", gatePluginPath, []output.PerfDatum{
 		{Label: "latency", Unit: "%", Value: 1}, // unit drift: time -> percent
 	})
 	counters := router.dropCounters()
@@ -138,9 +147,23 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 				metrix.Label{Key: "nagios_scheduler", Value: "default"},
 				metrix.Label{Key: "nagios_job", Value: "gate_job"},
 			)
-			sm.Gauge("perf_bytes_a_value", metrix.WithUnit("bytes"), metrix.WithFloat(true)).Observe(1, ls)
+			aFields := defaultPerfMeasureSetValues()
+			aFields[perfFieldValue] = 1
+			sm.MeasureSetGauge(
+				"check_gate.bytes_a",
+				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+				metrix.WithChartFamily("check_gate"),
+				metrix.WithUnit("bytes"),
+			).ObserveFields(aFields, ls)
 			if includeB {
-				sm.Gauge("perf_bytes_b_value", metrix.WithUnit("bytes"), metrix.WithFloat(true)).Observe(2, ls)
+				bFields := defaultPerfMeasureSetValues()
+				bFields[perfFieldValue] = 2
+				sm.MeasureSetGauge(
+					"check_gate.bytes_b",
+					metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+					metrix.WithChartFamily("check_gate"),
+					metrix.WithUnit("bytes"),
+				).ObserveFields(bFields, ls)
 			}
 			cc.CommitCycleSuccess()
 
@@ -168,7 +191,14 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 			metrix.Label{Key: "nagios_scheduler", Value: "default"},
 			metrix.Label{Key: "nagios_job", Value: "gate_job"},
 		)
-		sm.Gauge("perf_bytes_a_value", metrix.WithUnit("bytes"), metrix.WithFloat(true)).Observe(1, ls)
+		aFields := defaultPerfMeasureSetValues()
+		aFields[perfFieldValue] = 1
+		sm.MeasureSetGauge(
+			"check_gate.bytes_a",
+			metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+			metrix.WithChartFamily("check_gate"),
+			metrix.WithUnit("bytes"),
+		).ObserveFields(aFields, ls)
 		cc.AbortCycle()
 		if status := store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus; status != metrix.CollectStatusFailed {
 			t.Fatalf("expected failed collect status after abort, got %q", status)
@@ -194,8 +224,8 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		if removeActionsCount(plan2.Actions) != 0 {
 			t.Fatalf("expected no remove actions on cycle 2")
 		}
-		assertPlanHasUpdateForTarget(t, plan2, "nagios.perf_bytes_a_value")
-		assertPlanHasNoRemoveForTarget(t, plan2, "nagios.perf_bytes_b_value")
+		assertPlanHasUpdateForTarget(t, plan2, "nagios.check_gate.bytes_a")
+		assertPlanHasNoRemoveForTarget(t, plan2, "nagios.check_gate.bytes_b")
 
 		cc := gateCycleController(t, store)
 		cc.BeginCycle()
@@ -204,7 +234,14 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 			metrix.Label{Key: "nagios_scheduler", Value: "default"},
 			metrix.Label{Key: "nagios_job", Value: "gate_job"},
 		)
-		sm.Gauge("perf_bytes_a_value", metrix.WithUnit("bytes"), metrix.WithFloat(true)).Observe(1, ls)
+		aFields := defaultPerfMeasureSetValues()
+		aFields[perfFieldValue] = 1
+		sm.MeasureSetGauge(
+			"check_gate.bytes_a",
+			metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+			metrix.WithChartFamily("check_gate"),
+			metrix.WithUnit("bytes"),
+		).ObserveFields(aFields, ls)
 		cc.AbortCycle()
 		if status := store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus; status != metrix.CollectStatusFailed {
 			t.Fatalf("expected failed collect status after abort, got %q", status)
@@ -215,8 +252,8 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 			t.Fatalf("expected remove actions on cycle 3 after failed-attempt gap")
 		}
 		assertPlanHasUpdateAndRemoveForTargets(t, plan3,
-			"nagios.perf_bytes_a_value",
-			"nagios.perf_bytes_b_value",
+			"nagios.check_gate.bytes_a",
+			"nagios.check_gate.bytes_b",
 		)
 		plan4 := emit(false)
 		if removeActionsCount(plan4.Actions) != 0 {
@@ -246,7 +283,7 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 			router := newPerfdataRouter(64)
 			displayV1 := legacyDisplayValue(tc.unit, tc.raw)
 
-			samples := router.route("default", "gate_job", []output.PerfDatum{
+			samples := router.route("default", "gate_job", gatePluginPath, []output.PerfDatum{
 				{Label: "sample", Unit: tc.unit, Value: tc.raw},
 			})
 			var (
@@ -289,10 +326,18 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 			cc := gateCycleController(t, store)
 			cc.BeginCycle()
 			sm := store.Write().SnapshotMeter("nagios")
-			sm.Gauge(candidateKey, metrix.WithUnit(candidateMet.unit), metrix.WithFloat(candidateMet.float)).
-				Observe(candidate, sm.LabelSet())
+			for _, measureSet := range buildPerfMeasureSets(samples) {
+				sm.MeasureSetGauge(
+					measureSet.name,
+					metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+					metrix.WithChartFamily(measureSet.scriptName),
+					metrix.WithUnit(measureSet.unit),
+				).ObserveFields(measureSet.values, sm.LabelSet())
+			}
 			cc.CommitCycleSuccess()
-			assertMetricMeta(t, store.Read(metrix.ReadRaw()), "nagios."+candidateKey, tc.expectedUnit, true)
+			flat := store.Read(metrix.ReadFlatten())
+			assertMetricMeta(t, flat, "nagios."+candidateKey, tc.expectedUnit, true)
+			assertMetricChartFamily(t, flat, "nagios."+candidateKey, "check_gate")
 		})
 	}
 }
@@ -331,6 +376,17 @@ func assertMetricMeta(t *testing.T, reader metrix.Reader, metricName, unit strin
 	}
 	if meta.Float != isFloat {
 		t.Fatalf("unexpected float metadata for %q: got=%t want=%t", metricName, meta.Float, isFloat)
+	}
+}
+
+func assertMetricChartFamily(t *testing.T, reader metrix.Reader, metricName, chartFamily string) {
+	t.Helper()
+	meta, ok := reader.MetricMeta(metricName)
+	if !ok {
+		t.Fatalf("missing metric metadata for %q", metricName)
+	}
+	if meta.ChartFamily != chartFamily {
+		t.Fatalf("unexpected chart family for %q: got=%q want=%q", metricName, meta.ChartFamily, chartFamily)
 	}
 }
 

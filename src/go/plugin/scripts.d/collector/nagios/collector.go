@@ -165,9 +165,14 @@ func (c *Collector) Collect(context.Context) error {
 		observeJob("job.attempt", float64(job.Attempt))
 		observeJob("job.max_attempts", float64(job.MaxAttempt))
 
-		perf := c.router.route(c.jobSpec.Scheduler, job.JobName, job.PerfSamples)
-		for _, sample := range perf {
-			sm.Gauge(sample.name, metrix.WithUnit(sample.unit), metrix.WithFloat(sample.float)).Observe(sample.value, jobLbl)
+		perf := c.router.route(c.jobSpec.Scheduler, job.JobName, c.jobSpec.Plugin, job.PerfSamples)
+		for _, measureSet := range buildPerfMeasureSets(perf) {
+			sm.MeasureSetGauge(
+				measureSet.name,
+				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+				metrix.WithChartFamily(measureSet.scriptName),
+				metrix.WithUnit(measureSet.unit),
+			).ObserveFields(measureSet.values, jobLbl)
 		}
 	}
 

@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"math"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -42,6 +43,7 @@ type perfMetricSample struct {
 type perfMetricBindingKey struct {
 	scheduler string
 	job       string
+	source    string
 	metricKey string
 }
 
@@ -73,10 +75,11 @@ func newPerfdataRouter(maxPerJob int) *perfdataRouter {
 	}
 }
 
-func (r *perfdataRouter) route(scheduler, job string, perf []output.PerfDatum) []perfMetricSample {
+func (r *perfdataRouter) route(scheduler, job, pluginPath string, perf []output.PerfDatum) []perfMetricSample {
 	if len(perf) == 0 {
 		return nil
 	}
+	source := perfSourceFromPlugin(pluginPath)
 
 	items := make([]perfPreparedDatum, 0, len(perf))
 	for _, datum := range perf {
@@ -127,6 +130,7 @@ func (r *perfdataRouter) route(scheduler, job string, perf []output.PerfDatum) [
 		binding := perfMetricBindingKey{
 			scheduler: scheduler,
 			job:       job,
+			source:    source,
 			metricKey: item.metricKey,
 		}
 		if prevClass, ok := r.classByMetric[binding]; ok && prevClass != item.class {
@@ -137,7 +141,7 @@ func (r *perfdataRouter) route(scheduler, job string, perf []output.PerfDatum) [
 			r.classByMetric[binding] = item.class
 		}
 
-		base := fmt.Sprintf("perf_%s_%s", item.class, item.metricKey)
+		base := fmt.Sprintf("%s.%s_%s", source, item.class, item.metricKey)
 		classUnit := unitForClass(item.class)
 		samples = append(samples, perfMetricSample{name: base + "_value", value: item.value, unit: classUnit, float: true})
 		if item.min != nil {
@@ -184,6 +188,9 @@ func preparePerfDatum(datum output.PerfDatum) (perfPreparedDatum, bool) {
 
 func thresholdSamples(base, kind string, rng *output.ThresholdRange, classUnit string) []perfMetricSample {
 	prefix := base + "_" + kind
+	// FIXME(nagios-measureset-split): keep threshold state flags in the same perf family for now
+	// (current PR scope). Follow-up PR must split *_defined/*_inclusive/*_low_defined/*_high_defined
+	// into a dedicated state family/chart.
 	if rng == nil {
 		return []perfMetricSample{
 			{name: prefix + "_defined", value: 0, unit: "state", float: false},
@@ -398,4 +405,16 @@ func isWhitespace(r rune) bool {
 		return true
 	}
 	return false
+}
+
+func perfSourceFromPlugin(pluginPath string) string {
+	base := filepath.Base(strings.TrimSpace(pluginPath))
+	if base == "" || base == "." || base == string(filepath.Separator) {
+		base = "script"
+	}
+	ext := filepath.Ext(base)
+	if ext != "" {
+		base = strings.TrimSuffix(base, ext)
+	}
+	return sanitizeMetricKey(base)
 }

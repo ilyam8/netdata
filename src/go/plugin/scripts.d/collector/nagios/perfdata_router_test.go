@@ -10,12 +10,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
 )
 
+const testPluginPath = "/opt/nagios-scripts/check_memory.pl"
+
 func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 	router := newPerfdataRouter(64)
 
 	warnLow := 100.0
 	warnHigh := 500.0
-	got := router.route("default", "job1", []output.PerfDatum{
+	got := router.route("default", "job1", testPluginPath, []output.PerfDatum{
 		{
 			Label: "latency",
 			Unit:  "ms",
@@ -34,36 +36,36 @@ func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 	})
 
 	samples := sampleMap(got)
-	assertNear(t, samples["perf_time_latency_value"], 0.12)
-	assertNear(t, samples["perf_bytes_throughput_value"], 30_000)
-	assertNear(t, samples["perf_bits_traffic_value"], 1_500_000)
-	assertNear(t, samples["perf_percent_free_pct_value"], 40)
-	assertNear(t, samples["perf_counter_checks_value"], 3)
-	assertNear(t, samples["perf_generic_custom_value"], 7.25)
-	assertNear(t, samples["perf_time_latency_warn_defined"], 1)
-	assertNear(t, samples["perf_time_latency_warn_inclusive"], 1)
-	assertNear(t, samples["perf_time_latency_warn_low"], 0.1)
-	assertNear(t, samples["perf_time_latency_warn_high"], 0.5)
-	assertString(t, sampleUnits(got)["perf_time_latency_value"], "seconds")
-	assertString(t, sampleUnits(got)["perf_bytes_throughput_value"], "bytes")
-	assertString(t, sampleUnits(got)["perf_bits_traffic_value"], "bits")
-	assertString(t, sampleUnits(got)["perf_percent_free_pct_value"], "%")
-	assertString(t, sampleUnits(got)["perf_counter_checks_value"], "c")
-	assertString(t, sampleUnits(got)["perf_generic_custom_value"], "generic")
-	assertString(t, sampleUnits(got)["perf_time_latency_warn_defined"], "state")
+	assertNear(t, samples["check_memory.time_latency_value"], 0.12)
+	assertNear(t, samples["check_memory.bytes_throughput_value"], 30_000)
+	assertNear(t, samples["check_memory.bits_traffic_value"], 1_500_000)
+	assertNear(t, samples["check_memory.percent_free_pct_value"], 40)
+	assertNear(t, samples["check_memory.counter_checks_value"], 3)
+	assertNear(t, samples["check_memory.generic_custom_value"], 7.25)
+	assertNear(t, samples["check_memory.time_latency_warn_defined"], 1)
+	assertNear(t, samples["check_memory.time_latency_warn_inclusive"], 1)
+	assertNear(t, samples["check_memory.time_latency_warn_low"], 0.1)
+	assertNear(t, samples["check_memory.time_latency_warn_high"], 0.5)
+	assertString(t, sampleUnits(got)["check_memory.time_latency_value"], "seconds")
+	assertString(t, sampleUnits(got)["check_memory.bytes_throughput_value"], "bytes")
+	assertString(t, sampleUnits(got)["check_memory.bits_traffic_value"], "bits")
+	assertString(t, sampleUnits(got)["check_memory.percent_free_pct_value"], "%")
+	assertString(t, sampleUnits(got)["check_memory.counter_checks_value"], "c")
+	assertString(t, sampleUnits(got)["check_memory.generic_custom_value"], "generic")
+	assertString(t, sampleUnits(got)["check_memory.time_latency_warn_defined"], "state")
 }
 
 func TestPerfdataRouterCollisionPolicy(t *testing.T) {
 	router := newPerfdataRouter(64)
 
-	got := router.route("default", "job1", []output.PerfDatum{
+	got := router.route("default", "job1", testPluginPath, []output.PerfDatum{
 		{Label: "used-kb", Unit: "KB", Value: 2},
 		{Label: "used kb", Unit: "KB", Value: 1},
 	})
 
 	samples := sampleMap(got)
 	// Lexical order keeps "used kb" before "used-kb".
-	assertNear(t, samples["perf_bytes_used_kb_value"], 1_000)
+	assertNear(t, samples["check_memory.bytes_used_kb_value"], 1_000)
 
 	counters := router.dropCounters()
 	if counters.Collision != 1 {
@@ -74,20 +76,20 @@ func TestPerfdataRouterCollisionPolicy(t *testing.T) {
 func TestPerfdataRouterBudgetPolicy(t *testing.T) {
 	router := newPerfdataRouter(2)
 
-	got := router.route("default", "job1", []output.PerfDatum{
+	got := router.route("default", "job1", testPluginPath, []output.PerfDatum{
 		{Label: "a", Unit: "c", Value: 1},
 		{Label: "b", Unit: "c", Value: 2},
 		{Label: "c", Unit: "c", Value: 3},
 	})
 
 	samples := sampleMap(got)
-	if _, ok := samples["perf_counter_a_value"]; !ok {
+	if _, ok := samples["check_memory.counter_a_value"]; !ok {
 		t.Fatalf("expected metric a to be present")
 	}
-	if _, ok := samples["perf_counter_b_value"]; !ok {
+	if _, ok := samples["check_memory.counter_b_value"]; !ok {
 		t.Fatalf("expected metric b to be present")
 	}
-	if _, ok := samples["perf_counter_c_value"]; ok {
+	if _, ok := samples["check_memory.counter_c_value"]; ok {
 		t.Fatalf("expected metric c to be dropped by budget")
 	}
 
@@ -100,18 +102,18 @@ func TestPerfdataRouterBudgetPolicy(t *testing.T) {
 func TestPerfdataRouterUnitDriftPolicy(t *testing.T) {
 	router := newPerfdataRouter(64)
 
-	first := router.route("default", "job1", []output.PerfDatum{
+	first := router.route("default", "job1", testPluginPath, []output.PerfDatum{
 		{Label: "latency", Unit: "ms", Value: 10},
 	})
 	if len(first) == 0 {
 		t.Fatalf("expected first route to emit samples")
 	}
 
-	second := router.route("default", "job1", []output.PerfDatum{
+	second := router.route("default", "job1", testPluginPath, []output.PerfDatum{
 		{Label: "latency", Unit: "KB", Value: 10},
 	})
 	samples := sampleMap(second)
-	if _, ok := samples["perf_bytes_latency_value"]; ok {
+	if _, ok := samples["check_memory.bytes_latency_value"]; ok {
 		t.Fatalf("expected unit-drift sample to be dropped")
 	}
 
@@ -124,7 +126,7 @@ func TestPerfdataRouterUnitDriftPolicy(t *testing.T) {
 func TestPerfdataRouterInvalidSamples(t *testing.T) {
 	router := newPerfdataRouter(64)
 
-	_ = router.route("default", "job1", []output.PerfDatum{
+	_ = router.route("default", "job1", testPluginPath, []output.PerfDatum{
 		{Label: "", Unit: "ms", Value: 1},
 		{Label: "bad", Unit: "ms", Value: math.NaN()},
 	})
