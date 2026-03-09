@@ -185,15 +185,14 @@ func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Sched
 		workers = 1
 	}
 	sched, err := runtimepkg.NewScheduler(runtimepkg.SchedulerConfig{
-		Workers:       workers,
-		UserMacros:    map[string]string{"USER1": "/usr/lib/nagios/plugins"},
-		VnodeLookup:   vnodeLookup,
+		Workers:     workers,
+		UserMacros:  map[string]string{"USER1": "/usr/lib/nagios/plugins"},
+		VnodeLookup: vnodeLookup,
 	})
 	require.NoError(t, err)
 	for _, job := range jobs {
 		_, err := sched.RegisterJob(runtimepkg.JobRegistration{
 			Spec:             job,
-			Emitter:          emitter,
 			RegisterPerfdata: func(specpkg.JobSpec, output.PerfDatum) {},
 			Periods:          periods,
 		})

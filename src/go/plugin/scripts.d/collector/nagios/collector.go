@@ -11,7 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/execution"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
 )
@@ -95,7 +94,6 @@ func (c *Collector) Init(ctx context.Context) error {
 
 	handle, err := c.service.Attach(execution.Registration{
 		Spec:    c.jobSpec,
-		Emitter: runtime.NewLogEmitter(c.Logger),
 		Periods: c.periods,
 	})
 	if err != nil {

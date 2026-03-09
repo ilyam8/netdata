@@ -255,8 +255,7 @@ func gateJobRegistration(name string, interval time.Duration, runner func(contex
 			Timeout:          time.Second,
 			MaxCheckAttempts: 1,
 		},
-		Runner:  runner,
-		Emitter: runtime.NewNoopEmitter(),
+		Runner: runner,
 	}
 }
 

@@ -34,7 +34,6 @@ type SchedulerConfig struct {
 type JobRegistration struct {
 	Spec             spec.JobSpec
 	Runner           JobRunner
-	Emitter          ResultEmitter
 	RegisterPerfdata func(spec.JobSpec, output.PerfDatum)
 	Periods          *timeperiod.Set
 	UserMacros       map[string]string
@@ -105,7 +104,6 @@ type jobState struct {
 	statusLine      string
 	longOutput      string
 	jitterRange     time.Duration
-	emitter         ResultEmitter
 	registerPerf    func(spec.JobSpec, output.PerfDatum)
 	runner          JobRunner
 	userMacros      map[string]string
@@ -131,12 +129,12 @@ func NewScheduler(cfg SchedulerConfig) (*Scheduler, error) {
 		queueCap = 32
 	}
 	s := &Scheduler{
-		log:           cfg.Logger,
-		timerCh:       make(chan string, queueCap),
-		jobs:          make(map[string]*jobState),
-		userMacros:    userMacros,
-		vnodeLookup:   lookup,
-		rand:          rand.New(rand.NewSource(time.Now().UnixNano())),
+		log:         cfg.Logger,
+		timerCh:     make(chan string, queueCap),
+		jobs:        make(map[string]*jobState),
+		userMacros:  userMacros,
+		vnodeLookup: lookup,
+		rand:        rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	workFn := func(ctx context.Context, job JobRuntime) ExecutionResult {
 		return s.runJob(ctx, job)
@@ -158,9 +156,6 @@ func NewScheduler(cfg SchedulerConfig) (*Scheduler, error) {
 func (s *Scheduler) RegisterJob(reg JobRegistration) (string, error) {
 	if strings.TrimSpace(reg.Spec.Name) == "" {
 		return "", fmt.Errorf("job name is required")
-	}
-	if reg.Emitter == nil {
-		reg.Emitter = NewNoopEmitter()
 	}
 	jobID := strings.TrimSpace(reg.ID)
 	if jobID == "" {
@@ -206,7 +201,6 @@ func (s *Scheduler) RegisterJob(reg JobRegistration) (string, error) {
 		maxAttempts:     maxInt(reg.Spec.MaxCheckAttempts, 1),
 		timeoutState:    normalizeState(reg.Spec.TimeoutState),
 		jitterRange:     reg.Spec.InterCheckJitter,
-		emitter:         reg.Emitter,
 		registerPerf:    reg.RegisterPerfdata,
 		runner:          reg.Runner,
 		userMacros:      userMacros,
@@ -235,9 +229,6 @@ func (s *Scheduler) UnregisterJob(jobID string) {
 	s.executor.Cancel(js.runtime)
 	if js.timer != nil {
 		js.timer.Stop()
-	}
-	if js.emitter != nil {
-		_ = js.emitter.Close()
 	}
 	delete(s.jobs, jobID)
 }
@@ -359,7 +350,6 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 		js = nil
 	}
 	var jobSpec spec.JobSpec
-	var snapshot JobSnapshot
 	var scheduleRetry bool
 	var measured bool
 	if ok {
@@ -375,7 +365,6 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 		js.statusLine = parsed.StatusLine
 		js.longOutput = parsed.LongOutput
 		js.updatePerfdata(parsed.Perfdata)
-		prevHard := js.hardState
 		js.recordResult(res.State)
 		js.periodSkipped = false
 		if js.retrying {
@@ -383,15 +372,6 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 			js.nextAnniversary = s.advanceAnniversary(base, js.retryInterval, base)
 			js.nextRun = s.applyJitter(js.nextAnniversary, js.jitterRange)
 			scheduleRetry = true
-		}
-		snapshot = JobSnapshot{
-			HardState:     js.hardState,
-			SoftState:     js.softState,
-			PrevHardState: prevHard,
-			Attempts:      js.softAttempts,
-			Duration:      res.Duration,
-			Timestamp:     res.End,
-			Output:        parsed,
 		}
 	}
 	s.jobMu.Unlock()
@@ -405,9 +385,6 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 			s.log.Debugf("nagios job %s completed without CPU usage data; emitting zero", res.Job.Spec.Name)
 		}
 		s.registerPerfdataCharts(jobSpec, parsed.Perfdata, js.registerPerf)
-		if js.emitter != nil {
-			js.emitter.Emit(res.Job, res, snapshot)
-		}
 	}
 }
 

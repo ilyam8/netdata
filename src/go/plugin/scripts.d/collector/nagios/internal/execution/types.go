@@ -15,7 +15,6 @@ import (
 type Registration struct {
 	Spec             spec.JobSpec
 	Runner           runtime.JobRunner
-	Emitter          runtime.ResultEmitter
 	RegisterPerfdata func(spec.JobSpec, output.PerfDatum)
 	Periods          *timeperiod.Set
 	UserMacros       map[string]string
@@ -60,7 +59,6 @@ func registrationToRuntime(reg Registration) runtime.JobRegistration {
 	return runtime.JobRegistration{
 		Spec:             reg.Spec,
 		Runner:           reg.Runner,
-		Emitter:          reg.Emitter,
 		RegisterPerfdata: reg.RegisterPerfdata,
 		Periods:          reg.Periods,
 		UserMacros:       reg.UserMacros,

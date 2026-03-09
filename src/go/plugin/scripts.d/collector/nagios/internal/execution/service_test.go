@@ -61,7 +61,6 @@ func testJobRegistration(name string) Registration {
 		Runner: func(context.Context, runtime.JobRuntime, time.Duration) ([]byte, string, ndexec.ResourceUsage, error) {
 			return nil, "", ndexec.ResourceUsage{}, nil
 		},
-		Emitter: runtime.NewNoopEmitter(),
 	}
 }
 
@@ -282,7 +281,6 @@ func TestExecutionServiceSnapshotUpdatesRuntimeMetrics(t *testing.T) {
 		Runner: func(context.Context, runtime.JobRuntime, time.Duration) ([]byte, string, ndexec.ResourceUsage, error) {
 			return []byte("OK"), "", ndexec.ResourceUsage{}, nil
 		},
-		Emitter: runtime.NewNoopEmitter(),
 	})
 	if err != nil {
 		t.Fatalf("Attach() error = %v", err)
