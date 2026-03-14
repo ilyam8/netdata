@@ -306,6 +306,40 @@ func TestRegisterJobMethods_SuccessCommitsAllMethods(t *testing.T) {
 	assert.Len(t, mgr.moduleFuncs.getJobMethods("mod", "job1"), 2)
 }
 
+func TestRun_RegistersDyncfgConfigPrefixes(t *testing.T) {
+	fnReg := &recordingFunctionRegistry{}
+	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	in := make(chan []*confgroup.Group)
+	done := make(chan struct{})
+	go func() {
+		mgr.Run(ctx, in)
+		close(done)
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	require.True(t, mgr.WaitStarted(waitCtx), "manager did not report started")
+
+	cancel()
+	close(in)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("manager did not stop after cancel")
+	}
+
+	assert.ElementsMatch(t, []registeredPrefix{
+		{name: "config", prefix: mgr.dyncfgCollectorPrefixValue()},
+		{name: "config", prefix: mgr.dyncfgSecretStorePrefixValue()},
+		{name: "config", prefix: mgr.dyncfgVnodePrefixValue()},
+	}, fnReg.registeredPrefixes())
+}
+
 type lockProbeJob struct {
 	fullName   string
 	moduleName string
@@ -341,6 +375,7 @@ func (j *lockProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}
 type recordingFunctionRegistry struct {
 	mu         sync.Mutex
 	registered []string
+	prefixes   []registeredPrefix
 }
 
 func (r *recordingFunctionRegistry) Register(name string, _ func(functions.Function)) {
@@ -349,9 +384,13 @@ func (r *recordingFunctionRegistry) Register(name string, _ func(functions.Funct
 	r.mu.Unlock()
 }
 
-func (r *recordingFunctionRegistry) Unregister(string)                                       {}
-func (r *recordingFunctionRegistry) RegisterPrefix(string, string, func(functions.Function)) {}
-func (r *recordingFunctionRegistry) UnregisterPrefix(string, string)                         {}
+func (r *recordingFunctionRegistry) Unregister(string) {}
+func (r *recordingFunctionRegistry) RegisterPrefix(name, prefix string, _ func(functions.Function)) {
+	r.mu.Lock()
+	r.prefixes = append(r.prefixes, registeredPrefix{name: name, prefix: prefix})
+	r.mu.Unlock()
+}
+func (r *recordingFunctionRegistry) UnregisterPrefix(string, string) {}
 
 func (r *recordingFunctionRegistry) registeredNames() []string {
 	r.mu.Lock()
@@ -359,4 +398,17 @@ func (r *recordingFunctionRegistry) registeredNames() []string {
 	out := make([]string, len(r.registered))
 	copy(out, r.registered)
 	return out
+}
+
+func (r *recordingFunctionRegistry) registeredPrefixes() []registeredPrefix {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]registeredPrefix, len(r.prefixes))
+	copy(out, r.prefixes)
+	return out
+}
+
+type registeredPrefix struct {
+	name   string
+	prefix string
 }

@@ -16,6 +16,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -58,6 +61,8 @@ func New(cfg Config) *Manager {
 
 	seen := dyncfg.NewSeenCache[confgroup.Config]()
 	exposed := dyncfg.NewExposedCache[confgroup.Config]()
+	secretStoreSeen := dyncfg.NewSeenCache[secretstore.Config]()
+	secretStoreExposed := dyncfg.NewExposedCache[secretstore.Config]()
 	api := dyncfg.NewResponder(netdataapi.New(out))
 	fnReg := cfg.FnReg
 	if fnReg == nil {
@@ -72,6 +77,7 @@ func New(cfg Config) *Manager {
 	if vnodesReg == nil {
 		vnodesReg = make(map[string]*vnodes.VirtualNode)
 	}
+	storeCreators := backends.Creators()
 
 	mgr := &Manager{
 		Logger: logger.New().With(
@@ -92,14 +98,22 @@ func New(cfg Config) *Manager {
 		auditDataDir:       cfg.AuditDataDir,
 		functionJSONWriter: cfg.FunctionJSONWriter,
 		runtimeService:     cfg.RuntimeService,
+		secretResolver:     secretresolver.New(),
+		// Secretstore service is in-memory for this process.
+		// External replay/source-ingest rebuilds raw configs first; runtime publication
+		// is then derived from exposed entries through normal enable/update transitions.
+		secretStoreSvc: secretstore.NewService(storeCreators...),
 
-		moduleFuncs:       newModuleFuncRegistry(),
-		staticMethodsSeen: make(map[string]struct{}),
-		discoveredConfigs: newDiscoveredConfigsCache(),
-		seen:              seen,
-		exposed:           exposed,
-		runningJobs:       newRunningJobsCache(),
-		retryingTasks:     newRetryingTasksCache(),
+		moduleFuncs:        newModuleFuncRegistry(),
+		staticMethodsSeen:  make(map[string]struct{}),
+		discoveredConfigs:  newDiscoveredConfigsCache(),
+		seen:               seen,
+		exposed:            exposed,
+		secretStoreSeen:    secretStoreSeen,
+		secretStoreExposed: secretStoreExposed,
+		secretStoreDeps:    newSecretStoreDeps(),
+		runningJobs:        newRunningJobsCache(),
+		retryingTasks:      newRetryingTasksCache(),
 
 		started:    make(chan struct{}),
 		addCh:      make(chan confgroup.Config),
@@ -135,6 +149,23 @@ func New(cfg Config) *Manager {
 			dyncfg.CommandUserconfig,
 		},
 	})
+	mgr.secretStoreCb = &secretStoreCallbacks{mgr: mgr}
+	mgr.secretStoreHandler = dyncfg.NewHandler(dyncfg.HandlerOpts[secretstore.Config]{
+		Logger:    mgr.Logger,
+		API:       api,
+		Seen:      secretStoreSeen,
+		Exposed:   secretStoreExposed,
+		Callbacks: mgr.secretStoreCb,
+		Path:      fmt.Sprintf(dyncfgSecretStorePath, cfg.PluginName),
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandTest,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+		},
+	})
 
 	return mgr
 }
@@ -145,6 +176,9 @@ func (m *Manager) SetDyncfgResponder(responder *dyncfg.Responder) {
 		responder.SetTerminalFinalizer(m.dyncfgApi.TerminalFinalizer())
 	}
 	dyncfg.BindResponder(&m.dyncfgApi, m.handler, responder)
+	if responder != nil && m.secretStoreHandler != nil {
+		m.secretStoreHandler.SetAPI(responder)
+	}
 }
 
 type Manager struct {
@@ -171,14 +205,19 @@ type Manager struct {
 	// Registration is delayed until the first started job for a module.
 	staticMethodsSeen map[string]struct{}
 
-	discoveredConfigs *discoveredConfigs
-	seen              *dyncfg.SeenCache[confgroup.Config]
-	exposed           *dyncfg.ExposedCache[confgroup.Config]
-	retryingTasks     *retryingTasks
-	runningJobs       *runningJobs
+	discoveredConfigs  *discoveredConfigs
+	seen               *dyncfg.SeenCache[confgroup.Config]
+	exposed            *dyncfg.ExposedCache[confgroup.Config]
+	secretStoreSeen    *dyncfg.SeenCache[secretstore.Config]
+	secretStoreExposed *dyncfg.ExposedCache[secretstore.Config]
+	secretStoreDeps    *secretStoreDeps
+	retryingTasks      *retryingTasks
+	runningJobs        *runningJobs
 
-	handler     *dyncfg.Handler[confgroup.Config]
-	collectorCb *collectorCallbacks
+	handler            *dyncfg.Handler[confgroup.Config]
+	collectorCb        *collectorCallbacks
+	secretStoreHandler *dyncfg.Handler[secretstore.Config]
+	secretStoreCb      *secretStoreCallbacks
 
 	ctx        context.Context
 	started    chan struct{}
@@ -196,6 +235,9 @@ type Manager struct {
 	// RuntimeService is an optional runtime/internal metrics registration seam.
 	// When set, V2 jobs may register per-job runtime components.
 	runtimeService runtimecomp.Service
+
+	secretResolver *secretresolver.Resolver
+	secretStoreSvc secretstore.Service
 }
 
 func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
@@ -204,9 +246,11 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	m.ctx = ctx
 
 	m.fnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), dyncfg.WrapHandler(m.dyncfgConfig))
+	m.fnReg.RegisterPrefix("config", m.dyncfgSecretStorePrefixValue(), dyncfg.WrapHandler(m.dyncfgConfig))
 	m.fnReg.RegisterPrefix("config", m.dyncfgVnodePrefixValue(), dyncfg.WrapHandler(m.dyncfgConfig))
 
 	m.dyncfgVnodeModuleCreate()
+	m.dyncfgSecretStoreTemplatesCreate()
 
 	m.vnodes.ForEach(func(cfg *vnodes.VirtualNode) bool {
 		m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
@@ -354,6 +398,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 		entry = m.handler.AddDiscoveredConfig(cfg, dyncfg.StatusAccepted) // replace existing exposed
 	}
 
+	m.syncSecretStoreDepsForConfig(entry.Cfg)
 	m.handler.NotifyJobCreate(entry.Cfg, entry.Status)
 
 	if m.runModePolicy.AutoEnableDiscovered {
@@ -370,7 +415,9 @@ func (m *Manager) removeConfig(cfg confgroup.Config) {
 	if !ok {
 		return
 	}
+	// Stop first so running-state cleanup is applied against existing dependency state.
 	m.stopRunningJob(cfg.FullName())
+	m.secretStoreDeps.RemoveActiveJob(entry.Cfg.FullName())
 	m.fileStatus.remove(cfg)
 
 	if !isStock(cfg) || entry.Status == dyncfg.StatusRunning {
@@ -402,6 +449,7 @@ func (m *Manager) startRunningJob(job runtimeJob) {
 	m.runningJobs.lock()
 	m.runningJobs.add(job.FullName(), job)
 	m.runningJobs.unlock()
+	m.secretStoreDeps.setRunning(job.FullName(), true)
 
 	// Track job for module function routing.
 	m.moduleFuncs.addJob(job.ModuleName(), job.Name(), job)
@@ -425,6 +473,9 @@ func (m *Manager) stopRunningJob(name string) {
 		m.runningJobs.remove(name)
 	}
 	m.runningJobs.unlock()
+	if ok {
+		m.secretStoreDeps.setRunning(name, false)
+	}
 
 	if ok {
 		// Unregister job-specific methods.
@@ -668,7 +719,43 @@ func newConfigModule(creator collectorapi.Creator) (configModule, error) {
 	return mod, nil
 }
 
-func applyConfig(cfg confgroup.Config, module any) error {
+func applyConfig(
+	ctx context.Context,
+	cfg confgroup.Config,
+	module any,
+	resolver *secretresolver.Resolver,
+	storeService secretstore.Service,
+	storeSnapshot *secretstore.Snapshot,
+) error {
+	if resolver == nil {
+		return fmt.Errorf("secret resolver is nil")
+	}
+	cfgResolved, err := cfg.Clone()
+	if err != nil {
+		return fmt.Errorf("cloning config: %w", err)
+	}
+	storeResolver := secretresolver.StoreRefResolver(nil)
+	if storeService != nil {
+		storeResolver = func(resolveCtx context.Context, ref, original string) (string, error) {
+			if resolveCtx == nil {
+				resolveCtx = ctx
+			}
+			return storeService.Resolve(resolveCtx, storeSnapshot, ref, original)
+		}
+	}
+	if err := resolver.ResolveWithStoreResolver(ctx, cfgResolved, storeResolver); err != nil {
+		return fmt.Errorf("resolving secrets: %w", err)
+	}
+	bs, err := yaml.Marshal(cfgResolved)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(bs, module)
+}
+
+// applyConfigRaw applies config without resolving secrets.
+// Used by dyncfg get to avoid exposing resolved secret values.
+func applyConfigRaw(cfg confgroup.Config, module any) error {
 	bs, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err

@@ -3,6 +3,7 @@
 package jobmgr
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -32,6 +35,10 @@ type jobFactory struct {
 	auditDataDir  string
 
 	runtimeService runtimecomp.Service
+
+	secretResolver *secretresolver.Resolver
+	secretStoreSvc secretstore.Service
+	ctx            context.Context
 }
 
 func newJobFactory(m *Manager) *jobFactory {
@@ -48,6 +55,9 @@ func newJobFactory(m *Manager) *jobFactory {
 		auditDataDir:  m.auditDataDir,
 
 		runtimeService: m.runtimeService,
+		secretResolver: m.secretResolver,
+		secretStoreSvc: m.secretStoreSvc,
+		ctx:            m.baseContext(),
 	}
 }
 
@@ -84,7 +94,11 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 	if mod == nil {
 		return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
 	}
-	if err := applyConfig(cfg, mod); err != nil {
+	storeSnapshot := (*secretstore.Snapshot)(nil)
+	if f.secretStoreSvc != nil {
+		storeSnapshot = f.secretStoreSvc.Capture()
+	}
+	if err := applyConfig(f.ctx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
 		return nil, err
 	}
 
@@ -119,7 +133,11 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 	}
 
 	mod := creator.Create()
-	if err := applyConfig(cfg, mod); err != nil {
+	storeSnapshot := (*secretstore.Snapshot)(nil)
+	if f.secretStoreSvc != nil {
+		storeSnapshot = f.secretStoreSvc.Capture()
+	}
+	if err := applyConfig(f.ctx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
 		return nil, err
 	}
 

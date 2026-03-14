@@ -15,6 +15,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -95,14 +96,17 @@ func (m *Manager) dyncfgCollectorSeqExec(fn dyncfg.Function) {
 	switch cmd {
 	case dyncfg.CommandAdd:
 		m.handler.CmdAdd(fn)
+		m.syncSecretStoreDepsByFunction(fn)
 	case dyncfg.CommandUpdate:
 		m.handler.CmdUpdate(fn)
+		m.syncSecretStoreDepsByFunction(fn)
 	case dyncfg.CommandEnable:
 		m.handler.CmdEnable(fn)
 	case dyncfg.CommandDisable:
 		m.handler.CmdDisable(fn)
 	case dyncfg.CommandRemove:
 		m.handler.CmdRemove(fn)
+		m.syncSecretStoreDepsByFunction(fn)
 	case dyncfg.CommandRestart:
 		m.handler.CmdRestart(fn)
 	case dyncfg.CommandTest:
@@ -241,7 +245,11 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 	defer cleanupCancel()
 	defer job.Cleanup(cleanupCtx)
 
-	if err := applyConfig(task.cfg, job); err != nil {
+	storeSnapshot := (*secretstore.Snapshot)(nil)
+	if m.secretStoreSvc != nil {
+		storeSnapshot = m.secretStoreSvc.Capture()
+	}
+	if err := applyConfig(m.baseContext(), task.cfg, job, m.secretResolver, m.secretStoreSvc, storeSnapshot); err != nil {
 		m.Warningf("dyncfg: test: module %s: failed to apply config: %v", task.moduleName, err)
 		m.dyncfgApi.SendCodef(task.fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
 		return
@@ -337,7 +345,7 @@ func (m *Manager) dyncfgCmdGet(fn dyncfg.Function) {
 		return
 	}
 
-	if err := applyConfig(entry.Cfg, mod); err != nil {
+	if err := applyConfigRaw(entry.Cfg, mod); err != nil {
 		m.Warningf("dyncfg: %s: module %s job %s failed to apply config: %v", cmd, mn, jn, err)
 		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
 		return
