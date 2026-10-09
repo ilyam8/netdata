@@ -182,7 +182,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist-tarball
           path: artifacts/*.tar.*
@@ -302,7 +302,7 @@ jobs:
       - name: Upload topology-ip-intel stock payload
         id: upload-stock
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: static-topology-ip-intel-stock
           path: ${{ github.workspace }}/.topology-ip-intel-stock/
@@ -442,7 +442,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
@@ -558,7 +558,7 @@ jobs:
           timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
@@ -567,7 +567,7 @@ jobs:
       - name: Upload MSYS2 Runtime Debug Symbols
         id: upload-msys2-runtime-debug
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-msys2-runtime-debug
           path: C:\msys64\msys2-runtime\*\msys-2.0.dbg
@@ -715,7 +715,7 @@ jobs:
       - name: Store GitHub Artifacts
         id: store-github
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: github-artifacts
           path: artifacts/github/*
@@ -724,7 +724,7 @@ jobs:
       - name: Store R2 Artifacts
         id: store-r2
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: r2-artifacts
           path: artifacts/r2/*
