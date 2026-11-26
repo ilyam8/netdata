@@ -801,6 +801,25 @@ jobs:
           pattern: windows-*-installer
           path: dist-artifacts
           merge-multiple: true
+      - name: Recompress the final source archive for the fork mismatch test
+        if: github.event_name == 'pull_request' && github.event.repository.fork && needs.file-check.outputs.early-source == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          source=(dist-artifacts/netdata-*.tar.zst)
+          test "${#source[@]}" -eq 1
+          altered="$RUNNER_TEMP/recompressed.tar.zst"
+          zstd -qdc "${source[0]}" | zstd -q -1 --no-check -o "$altered"
+          original_tar=$(zstd -qdc "${source[0]}" | sha256sum)
+          recompressed_tar=$(zstd -qdc "$altered" | sha256sum)
+          test "$original_tar" = "$recompressed_tar"
+          if cmp -s "${source[0]}" "$altered"; then
+            echo "::error::Mismatch fixture produced identical compressed bytes."
+            exit 1
+          fi
+          sha256sum "${source[0]}" "$altered"
+          mv "$altered" "${source[0]}"
       - name: Import GPG Keys
         id: import-keys
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
