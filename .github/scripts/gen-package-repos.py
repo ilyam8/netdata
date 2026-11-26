@@ -6,6 +6,7 @@ from modules.release_versions import stable_reaches_preview
 
 
 def package_repos(version: str, repo: str) -> list[str]:
+    # The primary repository always receives the package.
     repos = [repo]
     if stable_reaches_preview(version):
         repos.append(f'{repo}-preview')
