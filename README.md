@@ -551,4 +551,4 @@ The Netdata ecosystem includes:
     * [Netdata UI third-party licenses](https://app.netdata.cloud/3D_PARTY_LICENSES.txt)
 * **Netdata Cloud** – Closed-source, with free and paid tiers. Adds remote access, SSO, scalability.
 
-<!-- Go Tests fork pilot, initial documentation revision. -->
+<!-- Go Tests fork pilot, documentation follow-up. -->
