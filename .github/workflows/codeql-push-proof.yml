@@ -1,0 +1,46 @@
+name: CodeQL push scheduling proof
+on:
+  push:
+    branches: [ci/codeql-docs-push-proof]
+permissions:
+  contents: read
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      scan: ${{ steps.paths.outputs.scan }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - id: paths
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          scan=true
+          if git diff --no-renames --ignore-submodules=none --name-only -z "$BEFORE_SHA" "$AFTER_SHA" -- > "$RUNNER_TEMP/paths" && [ -s "$RUNNER_TEMP/paths" ]; then
+            scan=false
+            while IFS= read -r -d '' path; do
+              case "$path" in
+                docs/*.md|src/collectors/COLLECTORS.md|src/*/integrations/*.md) ;;
+                *) scan=true; break ;;
+              esac
+            done < "$RUNNER_TEMP/paths"
+          fi
+          echo "scan=$scan" >> "$GITHUB_OUTPUT"
+  analysis:
+    name: Stand-in for a running C/C++ scan
+    needs: select
+    if: needs.select.outputs.scan == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: codeql-push-proof-cpp-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Keep the runner active through the following push
+        if: github.event.head_commit.message != 'test-open-ended-final-code'
+        run: sleep 180
+      - run: echo "Reached the end of the simulated analysis"
