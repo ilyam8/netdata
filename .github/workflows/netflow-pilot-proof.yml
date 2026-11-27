@@ -1,0 +1,54 @@
+name: NetFlow planner regression proof
+on:
+  push:
+    branches: [ci/netflow-pilot-proof]
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      FIX: d207fff8116be525c871e878f20b23ff72898401
+      PLANNER: src/crates/netflow-plugin/src/query/planner/timeseries.rs
+      TEST_FILE: src/crates/netflow-plugin/src/query/tests.rs
+      TEST_NAME: init_timeseries_layout_keeps_bucket_count_bounded_for_full_u32_window
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_PROFILE_TEST_OVERFLOW_CHECKS: 'false'
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Prepare the original test and pre-fix planner
+        run: |
+          git diff --exit-code "$FIX" HEAD -- "$TEST_FILE" "$PLANNER"
+          git show "$FIX^:$PLANNER" > "$PLANNER"
+          msrv=$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' src/crates/Cargo.toml)
+          rustup toolchain install "$msrv" --profile minimal
+          echo "RUSTUP_TOOLCHAIN=$msrv" >> "$GITHUB_ENV"
+      - name: Run the original assertion before the fix
+        id: before
+        continue-on-error: true
+        working-directory: src/crates
+        run: |
+          cargo test --locked -p netflow-plugin --bin netflow-plugin "$TEST_NAME" 2>&1 | tee "$RUNNER_TEMP/before.log"
+      - name: Verify the original named assertion failed
+        env:
+          BEFORE: ${{ steps.before.outcome }}
+        run: |
+          test "$BEFORE" = failure
+          grep -E "^test .*::${TEST_NAME} \.\.\. FAILED$" "$RUNNER_TEMP/before.log"
+          grep -F 'assertion `left == right` failed' "$RUNNER_TEMP/before.log"
+          git show "$FIX:$PLANNER" > "$PLANNER"
+          git diff --exit-code "$FIX" -- "$TEST_FILE" "$PLANNER"
+      - name: Run the same assertion after the fix
+        working-directory: src/crates
+        run: |
+          cargo test --locked -p netflow-plugin --bin netflow-plugin "$TEST_NAME" 2>&1 | tee "$RUNNER_TEMP/after.log"
+          grep -E "^test .*::${TEST_NAME} \.\.\. ok$" "$RUNNER_TEMP/after.log"
+          grep -F 'test result: ok. 1 passed; 0 failed' "$RUNNER_TEMP/after.log"
