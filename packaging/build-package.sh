@@ -47,6 +47,7 @@ EOF
     )
 }
 
+# Native package builds retain debug information.
 add_cmake_option CMAKE_BUILD_TYPE RelWithDebInfo
 add_cmake_option CMAKE_INSTALL_PREFIX /
 add_cmake_option ENABLE_DASHBOARD on
