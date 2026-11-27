@@ -2,6 +2,7 @@
 
 import fnmatch
 import json
+import os
 import re
 import shlex
 import shutil
@@ -118,6 +119,62 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
                                         input=json.dumps({'script': script, 'files': files, 'count': count}))
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.strip(), expected)
+
+    def test_codeql_cpp_uses_cumulative_native_inputs(self) -> None:
+        workflow = CODEQL_WORKFLOW.read_text()
+        lines = workflow_step(workflow, "Check for C/C++ changes")
+        start = next(i for i, line in enumerate(lines) if line.strip() == "run: |")
+        script = textwrap.dedent("\n".join(lines[start + 1:]))
+
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+
+            def git(*args):
+                return subprocess.check_output(
+                    ["git", "-c", "user.name=CI", "-c", "user.email=ci@example.invalid",
+                     *args], cwd=repo, text=True,
+                ).strip()
+
+            def selected(base, head, always="false"):
+                output = repo / ".git" / "outputs"
+                output.write_text("")
+                env = dict(os.environ, BASE_SHA=base, HEAD_SHA=head, ALWAYS=always,
+                           GITHUB_OUTPUT=str(output))
+                subprocess.run(["bash", "-eo", "pipefail", "-c", script], cwd=repo,
+                               env=env, check=True, capture_output=True)
+                return output.read_text().strip()
+
+            git("init", "-q")
+            git("commit", "--allow-empty", "-qm", "base")
+            base = git("rev-parse", "HEAD")
+            alert = repo / "ram.conf"
+            alert.write_text("alert fixture\n")
+            (repo / "example.c.md").write_text("documentation\n")
+            git("add", "--", "ram.conf", "example.c.md")
+            git("commit", "-qm", "alerts and docs")
+            docs = git("rev-parse", "HEAD")
+            self.assertEqual(selected(base, docs), "run=false")
+            self.assertEqual(selected(base, docs, always="true"), "run=true")
+            # Each input should independently activate the query suite.
+            for path in ("src/a.cc", "src/a.h", "src/a.cpp", "src/a.hxx", "src/a.c++",
+                         "src/deep/CMakeLists.txt", "packaging/cmake/config.cmake.h.in",
+                         ".github/codeql/c-cpp-config.yml",
+                         "src/exporting/prometheus/remote_write/remote_write.proto"):
+                with self.subTest(path=path):
+                    before = git("rev-parse", "HEAD")
+                    f = repo / path
+                    f.parent.mkdir(exist_ok=True, parents=True)
+                    f.write_text("input\n")
+                    git("add", "--", path)
+                    git("commit", "-qm", "add input")
+                    self.assertEqual(selected(before, "HEAD"), "run=true")
+            (repo / "README.md").write_text("follow-up\n")
+            git("add", "--", "README.md")
+            git("commit", "-qm", "docs follow-up")
+            self.assertEqual(selected(base, "HEAD"), "run=true")
+            git("mv", "src/a.cc", "src/moved.md")
+            git("commit", "-qm", "move source")
+            self.assertEqual(selected("HEAD^", "HEAD"), "run=true")
 
     def test_codeql_go_and_rust_source_selection(self) -> None:
         workflow = CODEQL_WORKFLOW.read_text(encoding="utf-8")
