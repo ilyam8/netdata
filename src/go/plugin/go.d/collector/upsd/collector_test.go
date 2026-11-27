@@ -20,6 +20,7 @@ var (
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 )
 
+// Check that both configuration fixtures are available.
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
 		"dataConfigJSON": dataConfigJSON,
