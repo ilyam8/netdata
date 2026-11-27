@@ -13,7 +13,7 @@ use tracing::{error, info, warn};
 /// connection is dead.
 const IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// Waits for the next ping tick, or never when pings are disabled.
+/// Resolves on the next ping tick, or never when pings are disabled.
 async fn next_tick(timer: &mut Option<tokio::time::Interval>) {
     match timer {
         Some(timer) => {
