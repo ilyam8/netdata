@@ -12,7 +12,7 @@
 //!   as chart data over ferryboat IPC to the supervisor (`aggregation` →
 //!   `chart` → `output`).
 //!
-//! The supervisor spawns this crate as a worker process; [`run_worker`] is
+//! The supervisor starts this crate as a worker process; [`run_worker`] is
 //! the entry point (Configure → bind → build services → `Ready` → serve).
 //!
 //! # Modules
