@@ -155,6 +155,9 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
             docs = git("rev-parse", "HEAD")
             self.assertEqual(selected(base, docs), "run=false")
             self.assertEqual(selected(base, docs, always="true"), "run=true")
+            for missing_base, missing_head in (("", docs), (base, ""), ("", ""), ("missing-base", docs)):
+                with self.subTest(base=missing_base, head=missing_head):
+                    self.assertEqual(selected(missing_base, missing_head), "run=true")
             # Each input should independently activate the query suite.
             for path in ("src/a.cc", "src/a.h", "src/a.cpp", "src/a.hxx", "src/a.c++",
                          "src/deep/CMakeLists.txt", "packaging/cmake/config.cmake.h.in",

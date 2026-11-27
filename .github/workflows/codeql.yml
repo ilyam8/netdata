@@ -51,7 +51,8 @@ jobs:
         run: |
           # Only a successful, empty diff can skip the scan. Keep deletions and both sides of moves.
           run=true
-          if [ "$ALWAYS" = false ] && git diff --quiet --no-renames --ignore-submodules=none "$BASE_SHA...$HEAD_SHA" -- \
+          if [ "$ALWAYS" = false ] && [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             git diff --quiet --no-renames --ignore-submodules=none "$BASE_SHA...$HEAD_SHA" -- \
               ':(icase)*.[ch]' ':(icase)*.cc' ':(icase)*.hh' ':(icase)*.[ch]pp' ':(icase)*.[ch]xx' ':(icase)*.[ch]++' \
               '*.inl' '*.ipp' '*.[ch].in' '*.cmake' '*.cmake.in' CMakeLists.txt '*/CMakeLists.txt' \
               '.github/codeql/c-cpp-config.yml' '.github/workflows/codeql.yml' .gitmodules \
