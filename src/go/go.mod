@@ -74,7 +74,7 @@ require (
 	github.com/prometheus/common v0.74.0
 	github.com/prometheus/prometheus v2.55.1+incompatible
 	github.com/r4sd/go-wsman v0.0.0-20261017002530-e63b50890f9c
-	github.com/redis/go-redis/v9 v9.23.0
+	github.com/redis/go-redis/v9 v9.24.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8
