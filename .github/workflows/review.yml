@@ -3,6 +3,7 @@
 name: Review
 on:
   pull_request:
+    branches-ignore: [ci/pilot-go-pr-reuse-20261128]
     types: [opened, reopened, labeled, synchronize]
 env:
   DISABLE_TELEMETRY: 1

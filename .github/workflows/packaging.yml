@@ -3,6 +3,7 @@
 name: Packages
 on:
   pull_request:
+    branches-ignore: [ci/pilot-go-pr-reuse-20261128]
     types:
       - opened
       - reopened

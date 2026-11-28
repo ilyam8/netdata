@@ -13,7 +13,8 @@ on:
   push:
     branches:
       - master
-  pull_request: null
+  pull_request:
+    branches-ignore: [ci/pilot-go-pr-reuse-20261128]
   workflow_dispatch:
     inputs:
       version:

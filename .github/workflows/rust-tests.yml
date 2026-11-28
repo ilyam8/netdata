@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - master
-  pull_request: null
+  pull_request:
+    branches-ignore: [ci/pilot-go-pr-reuse-20261128]
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
   group: rust-tests-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true

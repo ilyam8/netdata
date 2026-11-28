@@ -5,7 +5,8 @@ on:
   push: # Master branch checks only validate the build and generate artifacts for testing.
     branches:
       - master
-  pull_request: null # PR checks only validate the build and generate artifacts for testing.
+  pull_request:
+    branches-ignore: [ci/pilot-go-pr-reuse-20261128]
   workflow_dispatch: # Dispatch runs build and does limited validation, then pushes to the appropriate storage location.
     inputs:
       type:

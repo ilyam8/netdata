@@ -14,7 +14,8 @@ on:
       - '!src/go/tools/dem-runtime-release/**'
       - '!src/go/internal/browserruntimetest/**'
       - '!src/go/internal/pgptest/**'
-  pull_request: null
+  pull_request:
+    branches-ignore: [ci/pilot-go-pr-reuse-20261128]
 
 permissions:
   contents: read

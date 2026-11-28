@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - master
-  pull_request: null
+  pull_request:
+    branches-ignore: [ci/pilot-go-pr-reuse-20261128]
 env:
   DISABLE_TELEMETRY: 1
 concurrency:

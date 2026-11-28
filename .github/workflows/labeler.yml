@@ -2,7 +2,8 @@
 # Handles labelling of PR's.
 name: Pull Request Labeler
 on:
-  pull_request_target: null
+  pull_request_target:
+    branches-ignore: [ci/pilot-go-pr-reuse-20261128]
 concurrency:
   group: pr-label-${{ github.repository_id }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true

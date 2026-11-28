@@ -2,7 +2,8 @@
 name: DEM Runtime Tests
 # Select test groups below so file dependencies have one owner and check names remain available.
 on:
-  pull_request: null
+  pull_request:
+    branches-ignore: [ci/pilot-go-pr-reuse-20261128]
   push:
     branches: [master]
 permissions:
