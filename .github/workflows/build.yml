@@ -57,6 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
+      skip-pr-build: ${{ github.event_name == 'pull_request' && steps.check-run.outputs.run == 'false' }}
       early-source: ${{ github.event_name == 'pull_request' && steps.check-source-files.outputs.any_modified == 'true' && steps.check-build-files.outputs.any_modified != 'true' }}
       skip-go: ${{ steps.check-go.outputs.skip-go }}
       static-native: ${{ steps.check-static.outputs.static-native }}
@@ -285,6 +286,7 @@ jobs:
   static-matrix: # Generate the static build matrix.
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
+    if: needs.file-check.outputs.skip-pr-build != 'true'
     needs:
       - file-check
     outputs:
@@ -331,6 +333,7 @@ jobs:
   prepare-static-topology-ip-intel-stock:
     name: Prepare static topology-ip-intel stock payload
     runs-on: ubuntu-latest
+    if: needs.file-check.outputs.skip-pr-build != 'true'
     needs:
       - file-check
     steps:
@@ -588,6 +591,7 @@ jobs:
   windows-build: # Build on Windows
     name: Build Windows
     runs-on: windows-latest
+    if: needs.file-check.outputs.skip-pr-build != 'true'
     needs:
       - file-check
     steps:
@@ -892,6 +896,7 @@ jobs:
     name: Test Consolidated Artifacts (Source)
     runs-on: ubuntu-latest
     needs:
+      - release-companion
       - build-dist
       - prepare-upload
       - file-check
@@ -905,7 +910,10 @@ jobs:
     steps:
       - name: Require successful source inputs
         if: >-
-          always() && (needs.file-check.result != 'success' || needs.prepare-upload.result != 'success' ||
+          always() && (needs.file-check.result != 'success' || needs.build-dist.result != 'success' ||
+          needs.release-companion.result != 'success' ||
+          (needs.prepare-upload.result != 'success' &&
+          !(needs.file-check.outputs.skip-pr-build == 'true' && needs.prepare-upload.result == 'skipped')) ||
           (needs.file-check.outputs.early-source == 'true' &&
           (needs.build-dist.outputs.source-install-result != 'success' || needs.build-dist.outputs.tested-source == '')))
         run: |
@@ -972,9 +980,9 @@ jobs:
 
   artifact-verification-static: # Verify the static installer works with the consolidated artifacts.
     if: >-
-      ${{ !failure() && !cancelled()
-          && needs.prepare-upload.result == 'success'
-          && needs.file-check.result == 'success' }}
+      ${{ !failure() && !cancelled() && needs.file-check.result == 'success'
+          && (needs.prepare-upload.result == 'success' ||
+              (needs.file-check.outputs.skip-pr-build == 'true' && needs.prepare-upload.result == 'skipped')) }}
     name: Test Consolidated Artifacts (Static)
     runs-on: ubuntu-latest
     needs:
@@ -1526,7 +1534,7 @@ jobs:
   source-build: # Test various source build arrangements.
     name: Test Source Build
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.skip-pr-build != 'true'
     needs:
       - src-matrix
       - file-check
@@ -1596,7 +1604,7 @@ jobs:
   macos-build: # Test building on macOS
     name: Test building on macOS
     runs-on: ${{ matrix.runner }}
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.skip-pr-build != 'true'
     needs:
       - file-check
     strategy:
