@@ -6,7 +6,7 @@ on:
     types: [opened, reopened, labeled, synchronize]
     branches: [master]
   push:
-    branches: [master]
+    branches: [ci/pilot-master-codeql-control]
   schedule:
     - cron: "27 2 * * 1"
 env:
@@ -16,6 +16,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   prepare:
+    if: github.event.before != '0000000000000000000000000000000000000000'
     name: Prepare Jobs
     runs-on: ubuntu-latest
     outputs:
