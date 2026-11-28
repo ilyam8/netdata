@@ -2,6 +2,7 @@
 
 import fnmatch
 import json
+import os
 import re
 import shlex
 import shutil
@@ -32,6 +33,13 @@ BROAD_GO_PATH_PATTERNS = (
     "**/go.mod",
     "**/go.sum",
 )
+
+
+def isolated_git_env() -> dict[str, str]:
+    # A hook can export the caller's repository or index even when cwd points at a fixture.
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    return env
 
 
 def shell_trigger_matches(path: str) -> bool:
@@ -150,10 +158,11 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
         selector = ROOT / ".github/scripts/pr-package-scope.py"
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp)
+            git_env = isolated_git_env()
             def git(*args):
                 return subprocess.check_output(
                     ["git", "-c", "user.name=CI", "-c", "user.email=ci@example.invalid",
-                     *args], cwd=repo, text=True,
+                     *args], cwd=repo, env=git_env, text=True,
                 ).strip()
             git("init", "-q")
             (repo / tool).parent.mkdir(parents=True)
@@ -168,7 +177,7 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
             git("commit", "-qm", "remove package resource")
             def selected():
                 return subprocess.check_output(
-                    ["python3", str(selector), base, "HEAD"], text=True, cwd=repo,
+                    ["python3", str(selector), base, "HEAD"], text=True, cwd=repo, env=git_env,
                 ).strip()
             self.assertEqual(selected(), "ordinary")
             (repo / "README.md").symlink_to("missing-resource")
