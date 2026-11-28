@@ -52,6 +52,23 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 			}, nil
 		}
 	}
+	// sessionsWith answers the startup check with the first results and every
+	// later session with the second.
+	sessionsWith := func(first, later map[string]queryResult) func(context.Context) (querySession, error) {
+		results := first
+		return func(context.Context) (querySession, error) {
+			session := &fakeSession{
+				results: results,
+			}
+			results = later
+			return session, nil
+		}
+	}
+	withSystemUUID := func(reply queryResult) map[string]queryResult {
+		results := validQueryResults()
+		results[querySystemUUID] = reply
+		return results
+	}
 	tests := map[string]struct {
 		options    map[string]any
 		newSession func(context.Context) (querySession, error)
@@ -104,14 +121,43 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 				},
 			},
 			newSession: sessionWith(map[string]queryResult{
-				queryCPU:    {err: classified},
-				queryMemory: {},
+				querySystemUUID: systemUUIDResult(),
+				queryCPU:        {err: classified},
+				queryMemory:     {},
 			}),
 			wantErr: "no enabled WMI query group succeeded: CPU WMI query failed: WMI collection timed out\n" +
 				"memory WMI query returned no usable observations\n" +
 				"memory counters WMI query failed\n" +
 				"paging file WMI query failed\n" +
 				"NUMA node WMI query failed",
+		},
+		"unreadable system UUID": {
+			newSession: sessionWith(withSystemUUID(queryResult{
+				err: classified,
+			})),
+			wantErr: "system UUID WMI query failed: WMI collection timed out",
+		},
+		"another machine at the address": {
+			newSession: sessionsWith(
+				validQueryResults(),
+				withSystemUUID(fixtureRows(map[string]any{"UUID": otherSystemUUID})),
+			),
+			collect: true,
+			wantErr: "host system UUID differs from the one read when the job started",
+		},
+		"failed system UUID re-read is logged": {
+			newSession: sessionsWith(
+				validQueryResults(),
+				withSystemUUID(queryResult{
+					err: unclassified,
+				}),
+			),
+			collect: true,
+			wantLog: []string{"system UUID WMI query failed"},
+		},
+		"host without a usable system UUID is logged": {
+			newSession: sessionWith(withSystemUUID(fixtureRows(map[string]any{"UUID": ""}))),
+			wantLog:    []string{"host reports no usable system UUID: its node is identified by the configured host"},
 		},
 		"collection timeout": {
 			options:    map[string]any{"timeout": "50ms"},
@@ -120,6 +166,7 @@ func TestCollector_SecretReferenceJobKeepsPublicMessages(t *testing.T) {
 		},
 		"failed groups are logged": {
 			newSession: sessionWith(map[string]queryResult{
+				querySystemUUID:        systemUUIDResult(),
 				queryCPU:               {err: classified},
 				queryMemory:            {err: unclassified},
 				querySystem:            validQueryResults()[querySystem],

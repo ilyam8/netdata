@@ -247,7 +247,8 @@ func TestCollector_JobV2Publication(t *testing.T) {
 				assert.Contains(t, output, "SET 'used' = 6442450944")
 				if vnode.Name != "" {
 					assert.Contains(t, output, "HOST_DEFINE '"+namedGUID+"' 'configured.example.com'")
-					assert.NotContains(t, output, c.VirtualNode().GUID)
+					assert.Nil(t, c.VirtualNode())
+					assert.NotContains(t, output, fixtureNodeGUID)
 					assert.NotContains(t, output, "HOST_LABEL '_os_edition'")
 					// A named node keeps its own lifecycle setting.
 					if vnode.StaleAfter != nil {
@@ -258,6 +259,7 @@ func TestCollector_JobV2Publication(t *testing.T) {
 					return
 				}
 				guid := c.VirtualNode().GUID
+				assert.Equal(t, fixtureNodeGUID, guid)
 				assert.Contains(t, output, "HOST_DEFINE '"+guid+"' 'WIN-LAB'")
 				assert.Contains(t, output, "HOST_LABEL '_vnode_type' 'wmi'")
 				assert.Contains(t, output, "HOST_LABEL 'address' 'windows.example.com'")

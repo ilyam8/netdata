@@ -35,6 +35,20 @@ such as `${env:WMI_PASSWORD}` resolve the same way:
 
 The debug output shows the job's checks and collections, and the charts it sends for the host's virtual node.
 
+## Node identity
+
+A job without `vnode` derives its node's GUID from the host's SMBIOS system UUID (`Win32_ComputerSystemProduct.UUID`):
+the SHA-1 name-based UUID, in the DNS namespace, of `wmi:` plus the UUID in lowercase canonical form. A host whose
+firmware reports no usable UUID (empty, all zeros, all F's or a known firmware placeholder) gets `wmi:` plus its
+canonical `host` (a lowercase DNS name without the trailing dot, or an unmapped IP address) instead. The startup check
+reads the UUID and fixes the GUID for the life of the job; every collection reads it again as its first query and fails,
+publishing nothing, while the host reports another identity (`collector/windows/identity.go`). The plugin never logs
+the UUID. To see a host's UUID:
+
+```powershell
+Get-CimInstance Win32_ComputerSystemProduct | Select-Object UUID
+```
+
 ## Kerberos
 
 Kerberos jobs (`auth: kerberos`, DCOM only) read no `krb5.conf`: the realm comes from the `username` domain and the

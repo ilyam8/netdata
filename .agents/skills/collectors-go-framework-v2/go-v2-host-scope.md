@@ -52,7 +52,14 @@ or virtual-node targets.
   shared flattened snapshot's fresh-visible catalog. It does not probe every
   scope with another flattened read.
 - Default-scope metrics continue to emit under the job-level vnode when one is
-  configured, otherwise under the global host.
+  configured, otherwise under the collector's generated vnode (`VirtualNode()`),
+  otherwise under the global host.
+- Jobruntime reads `VirtualNode()` when it prepares each emission, after a
+  successful `Collect` and so never before a successful `Check`, and at job
+  cleanup; never for a job with a configured vnode. A nil result targets the
+  global host, and a changed GUID switches hosts. An identity read from the
+  target is therefore established in `Check` and kept for the job's life
+  (`src/go/plugin/wmi/collector/windows/identity.go`).
 - Explicit non-default scopes emit under their `metrix.HostScope` GUID, subject to configured host authority.
 - Collection and `metrix.CommitCycleSuccess()` are still all-or-nothing.
 - Post-collect plan/apply/commit is per-scope partial success. A failed scope

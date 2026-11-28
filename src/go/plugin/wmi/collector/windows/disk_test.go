@@ -208,6 +208,7 @@ func TestCollector_DiskIntervalsSpanConsecutivePolls(t *testing.T) {
 	c.newSession = func(context.Context) (querySession, error) {
 		session := &fakeSession{
 			results: map[string]queryResult{
+				querySystemUUID:    systemUUIDResult(),
 				queryDisk:          fixtureRows(),
 				queryPhysicalDisks: polls[0],
 				queryDiskDrives:    fixtureRows(),
@@ -670,6 +671,7 @@ func TestCollector_DiskDriveLookup(t *testing.T) {
 	for i, poll := range polls {
 		current = &fakeSession{
 			results: map[string]queryResult{
+				querySystemUUID:    systemUUIDResult(),
 				queryDisk:          fixtureRows(),
 				queryPhysicalDisks: poll.disks,
 				queryDiskDrives:    poll.drives,

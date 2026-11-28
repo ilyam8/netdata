@@ -249,7 +249,7 @@
     },
     "host": {
       "ui:placeholder": "windows.example.com",
-      "ui:help": "The value identifies the job's virtual node, so changing it later creates a new node. With WinRM, it must match a name in the listener certificate."
+      "ui:help": "Changing it later keeps the job's virtual node when the host reports a system UUID. With WinRM, it must match a name in the listener certificate."
     },
     "transport": {
       "ui:widget": "radio",
@@ -288,7 +288,7 @@
     },
     "vnode": {
       "ui:placeholder": "windows-server",
-      "ui:help": "Leave empty and the job creates a virtual node for the Windows host, named after its computer name. To use a virtual node you manage instead, define it in `vnodes.conf` first, then enter its name here."
+      "ui:help": "Leave empty and the job creates a virtual node for the Windows host, identified by its system UUID and named after its computer name. To use a virtual node you manage instead, define it in `vnodes.conf` first, then enter its name here."
     }
   }
 }

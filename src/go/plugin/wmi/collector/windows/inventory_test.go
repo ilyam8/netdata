@@ -46,11 +46,12 @@ func TestInventoryRefresh(t *testing.T) {
 		)
 		c.newSession = func(context.Context) (querySession, error) { return session, nil }
 		require.NoError(t, c.Init(t.Context()))
-		initial := c.VirtualNode()
 		require.NoError(t, c.Check(t.Context()))
+		initial := c.VirtualNode()
 		require.Equal(
 			t,
 			[]string{
+				querySystemUUID,
 				queryCPU,
 				queryMemory,
 				queryMemoryCounters,
@@ -72,7 +73,7 @@ func TestInventoryRefresh(t *testing.T) {
 				queryDiskDrives,
 			},
 			session.queries,
-			"readiness must only wait for metrics",
+			"readiness waits for the identity and metric queries, not the inventory",
 		)
 		_, err := collecttest.CollectScalarSeries(c)
 		require.NoError(t, err)
@@ -107,6 +108,7 @@ func TestInventoryRefresh(t *testing.T) {
 		assert.Equal(
 			t,
 			[]string{
+				querySystemUUID,
 				queryCPU,
 				queryMemory,
 				queryMemoryCounters,
@@ -171,6 +173,7 @@ func TestInventoryTimeoutPreservesMetrics(t *testing.T) {
 		}}
 		c.newSession = func(context.Context) (querySession, error) { return session, nil }
 		require.NoError(t, c.Init(t.Context()))
+		require.NoError(t, c.Check(t.Context()))
 		start := time.Now()
 		metrics, err := collecttest.CollectScalarSeries(c)
 		require.NoError(t, err)
@@ -194,9 +197,13 @@ func TestInventoryDisabledQueries(t *testing.T) {
 			}
 			c.newSession = func(context.Context) (querySession, error) { return session, nil }
 			require.NoError(t, c.Init(t.Context()))
+			require.NoError(t, c.Check(t.Context()))
+			session.queries = nil
 			_, err := collecttest.CollectScalarSeries(c)
 			require.NoError(t, err)
 			if vnode != "" {
+				// A configured vnode owns the node's identity too.
+				assert.Nil(t, c.VirtualNode())
 				assert.Equal(
 					t,
 					[]string{
@@ -221,6 +228,7 @@ func TestInventoryDisabledQueries(t *testing.T) {
 				)
 				return
 			}
+			assert.Equal(t, querySystemUUID, session.queries[0])
 			assert.Contains(t, session.queries, queryOSInfo)
 			assert.NotContains(t, strings.Join(session.queries, " "), "Win32_LogicalDisk")
 		})
@@ -242,12 +250,15 @@ func TestInventoryStopsWhenSessionIsLost(t *testing.T) {
 	}
 	c.newSession = func(context.Context) (querySession, error) { return session, nil }
 	require.NoError(t, c.Init(t.Context()))
+	require.NoError(t, c.Check(t.Context()))
+	session.queries = nil
 
 	_, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.Equal(
 		t,
 		[]string{
+			querySystemUUID,
 			queryCPU,
 			queryMemory,
 			queryMemoryCounters,
@@ -266,7 +277,6 @@ func TestInventoryStopsWhenSessionIsLost(t *testing.T) {
 			queryPhysicalDisks,
 			querySMBServer,
 			querySMBShares,
-			queryDiskDrives,
 			queryOSInfo,
 			querySystemInfo,
 		},

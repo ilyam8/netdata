@@ -400,8 +400,18 @@ func withMemoryCounters(metrics map[string]metrix.SampleValue) map[string]metrix
 	return metrics
 }
 
+// fixtureSystemUUID is the fixture host's SMBIOS system UUID, as Windows
+// reports it.
+const fixtureSystemUUID = "4C4C4544-0042-3510-8051-B7C04F4E4D32"
+
+// systemUUIDResult is the fixture host's reply to the identity query.
+func systemUUIDResult() queryResult {
+	return fixtureRows(map[string]any{"UUID": fixtureSystemUUID})
+}
+
 func validQueryResults() map[string]queryResult {
 	return map[string]queryResult{
+		querySystemUUID: systemUUIDResult(),
 		// Instances come in no particular order; "1,0" is the first processor
 		// of the second NUMA node.
 		queryCPU: fixtureRows(
@@ -858,6 +868,7 @@ func TestCollector_NetworkAdapterQuery(t *testing.T) {
 			c.Collectors.Time = new(false)
 			session := &fakeSession{
 				results: map[string]queryResult{
+					querySystemUUID:        systemUUIDResult(),
 					queryNetworkInterfaces: tc.interfaces,
 					queryNetworkAdapters:   tc.adapters,
 				},
@@ -899,6 +910,7 @@ func TestCollector_CheckFailure(t *testing.T) {
 			c.Collectors.Time = new(false)
 			session := &fakeSession{
 				results: map[string]queryResult{
+					querySystemUUID:     systemUUIDResult(),
 					queryCPU:            {err: tc.queryErr},
 					queryMemory:         {err: tc.queryErr},
 					queryMemoryCounters: {err: tc.queryErr},
@@ -941,8 +953,8 @@ type cancellableSession struct {
 func (f *cancellableSession) Query(ctx context.Context, wql string) ([]map[string]any, error) {
 	f.queries = append(f.queries, wql)
 	assert.Same(f.t, f.ctx, ctx)
-	if wql == queryCPU {
-		return validQueryResults()[queryCPU].rows, nil
+	if wql == querySystemUUID || wql == queryCPU {
+		return validQueryResults()[wql].rows, nil
 	}
 	f.cancel()
 	return nil, ctx.Err()
@@ -971,7 +983,7 @@ func TestCollector_CancelDiscardsPartialCycle(t *testing.T) {
 	assert.ErrorIs(t, c.Collect(ctx), context.Canceled)
 	cycle.AbortCycle()
 
-	assert.Equal(t, []string{queryCPU, queryMemory}, session.queries)
+	assert.Equal(t, []string{querySystemUUID, queryCPU, queryMemory}, session.queries)
 	assert.True(t, session.closed)
 }
 
@@ -1032,22 +1044,35 @@ type sessionFailure struct{ error }
 
 func (sessionFailure) SessionFailed() bool { return true }
 
+// WinRM connects and logs in with the first query: the identity query for a
+// generated node, the first metric query for a configured one.
 func TestCollector_SessionFailureStopsThePoll(t *testing.T) {
-	c := configuredCollector()
-	c.Transport = transportWinRM
-	session := &fakeSession{
-		results: validQueryResults(),
-	}
-	session.results[queryCPU] = queryResult{
-		err: sessionFailure{errors.New("fixture-secret rejected")},
-	}
-	c.newSession = func(context.Context) (querySession, error) { return session, nil }
-	require.NoError(t, c.Init(t.Context()))
+	for name, tc := range map[string]struct {
+		vnode      string
+		firstQuery string
+	}{
+		"generated vnode":  {firstQuery: querySystemUUID},
+		"configured vnode": {vnode: "manual", firstQuery: queryCPU},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := configuredCollector()
+			c.Transport = transportWinRM
+			c.Vnode = tc.vnode
+			session := &fakeSession{
+				results: validQueryResults(),
+			}
+			session.results[tc.firstQuery] = queryResult{
+				err: sessionFailure{errors.New("fixture-secret rejected")},
+			}
+			c.newSession = func(context.Context) (querySession, error) { return session, nil }
+			require.NoError(t, c.Init(t.Context()))
 
-	err := c.Check(t.Context())
-	require.EqualError(t, err, "failed to open WMI session")
-	assert.Equal(t, []string{queryCPU}, session.queries)
-	assert.Equal(t, 1, session.closed)
+			err := c.Check(t.Context())
+			require.EqualError(t, err, "failed to open WMI session")
+			assert.Equal(t, []string{tc.firstQuery}, session.queries)
+			assert.Equal(t, 1, session.closed)
+		})
+	}
 }
 
 type stalledSession struct{ fakeSession }
@@ -1068,7 +1093,7 @@ func TestCollector_TimeoutNamesTheLimit(t *testing.T) {
 		err := c.Check(t.Context())
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.EqualError(t, err, "WMI collection did not finish within the timeout of 15s")
-		assert.Equal(t, []string{queryCPU}, session.queries)
+		assert.Equal(t, []string{querySystemUUID}, session.queries)
 	})
 }
 
@@ -1083,6 +1108,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 	}{
 		"after a successful group, keep its samples and skip the inventory": {
 			results: map[string]queryResult{
+				querySystemUUID:        systemUUIDResult(),
 				queryCPU:               validQueryResults()[queryCPU],
 				queryMemory:            validQueryResults()[queryMemory],
 				queryMemoryCounters:    lost,
@@ -1110,6 +1136,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 		},
 		"after a refused query, report the query failures": {
 			results: map[string]queryResult{
+				querySystemUUID:        systemUUIDResult(),
 				queryCPU:               {err: errors.New("WS-Management fault")},
 				queryMemory:            lost,
 				queryMemoryCounters:    lost,
@@ -1150,6 +1177,7 @@ func TestCollector_SessionLostMidPoll(t *testing.T) {
 			assert.Equal(
 				t,
 				[]string{
+					querySystemUUID,
 					queryCPU,
 					queryMemory,
 					queryMemoryCounters,
@@ -1301,6 +1329,7 @@ func TestCollector_SumsBothIPVersions(t *testing.T) {
 			c.Collectors.Time = new(false)
 			session := &fakeSession{
 				results: map[string]queryResult{
+					querySystemUUID:        systemUUIDResult(),
 					queryNetworkInterfaces: fixtureRows(),
 					queryTCPv4:             tc.tcpv4,
 					queryTCPv6:             tc.tcpv6,

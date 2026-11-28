@@ -35,17 +35,27 @@ func canonicalEndpoint(host string) string {
 	return strings.ToLower(strings.TrimSuffix(host, "."))
 }
 
-// newVirtualNode creates the job's generated node. Its GUID derives from the
-// endpoint, so a Windows rename keeps the node and its history; the inventory
-// later replaces the hostname with the Windows computer name. A failed
-// collection publishes nothing on the node, so the Agent marks it stale once
-// staleAfter passes without a successful collection.
-func newVirtualNode(host string, staleAfter time.Duration) *vnodes.VirtualNode {
-	endpoint := canonicalEndpoint(host)
+// nodeGUID derives the generated node's GUID from the host's SMBIOS system
+// UUID, so the node follows the machine through address changes and renames. A
+// host that reports no usable UUID is identified by its configured endpoint.
+func nodeGUID(systemUUID, host string) string {
+	name := systemUUID
+	if name == "" {
+		name = canonicalEndpoint(host)
+	}
+	return uuid.NewSHA1(uuid.NameSpaceDNS, []byte("wmi:"+name)).String()
+}
+
+// newVirtualNode creates the job's generated node for the host identified by
+// systemUUID (see nodeGUID); the inventory later replaces the hostname with the
+// Windows computer name. A failed collection publishes nothing on the node, so
+// the Agent marks it stale once staleAfter passes without a successful
+// collection.
+func newVirtualNode(systemUUID, host string, staleAfter time.Duration) *vnodes.VirtualNode {
 	stale := confopt.Duration(staleAfter)
 	return &vnodes.VirtualNode{
-		GUID:       uuid.NewSHA1(uuid.NameSpaceDNS, []byte("wmi:"+endpoint)).String(),
-		Hostname:   endpoint,
+		GUID:       nodeGUID(systemUUID, host),
+		Hostname:   canonicalEndpoint(host),
 		Labels:     map[string]string{"_vnode_type": "wmi", "_os": "windows", "address": host},
 		StaleAfter: &stale,
 	}

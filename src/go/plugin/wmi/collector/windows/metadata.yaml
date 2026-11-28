@@ -45,12 +45,12 @@ modules:
           - bandwidth, operations, latency, utilization and queue per physical disk, and the total disk I/O of the host;
           - the SMB file server's traffic, sessions, logons, open files, logon and access errors and resource shortages, and the open files, requests, connections and traffic of each share;
           - round-trip time and packet loss of ICMP ping from the poller;
-          - a node of its own in Netdata, named after the Windows computer name and labeled with its Windows version, hardware and default network address;
+          - a node of its own in Netdata that follows the machine through address changes, named after the Windows computer name and labeled with its Windows version, hardware and default network address;
           - host status: when the poller can no longer collect from the host, its node turns Stale and an alert on the poller notifies you.
 
           The charts use the same contexts as the Netdata Agent running on Windows, so the dashboard and the stock Windows alerts treat these hosts like Windows hosts that run the Agent. The ping charts use the contexts of Netdata's Ping collector, so its stock ping alerts apply too. TCP connections, connection opens, failures and resets, retransmissions, UDP errors and the Windows Time service's offset from the time source, which the Netdata Agent on Windows does not chart, use the contexts of the Netdata Agent on Linux; the Linux TCP and UDP alerts do not apply to them. The clock offset from the poller, the NTP round trip and time sources, and the SMB server's server-wide counters, which no other collector charts this way, have contexts of their own.
         method_description: |
-          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs one read-only WQL query in the `root\cimv2` namespace per enabled metric group (four for the memory group, six for the network group, two for the system, disk and SMB groups, and one more when a physical disk appears, until it has read the disk's model), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
+          `wmi.plugin` runs on a Netdata Agent, the poller. Every `update_every` seconds (30 by default) it connects to each configured Windows host, runs read-only WQL queries in the `root\cimv2` namespace, one for the host's system UUID (none when the job sets `vnode`) and one per enabled metric group (four for the memory group, six for the network group, two for the system, disk and SMB groups, and one more when a physical disk appears, until it has read the disk's model), and disconnects. Every five minutes the same connection also reads the host's system information for its node labels. The plugin only reads: it changes nothing on the host and opens no shell.
 
           While the queries run, the plugin also pings the host: it sends three ICMP echo requests, 100 ms apart, and charts the replies.
 
@@ -78,6 +78,7 @@ modules:
           | Disk | `Win32_LogicalDisk`, `Win32_PerfRawData_PerfDisk_PhysicalDisk`, `Win32_DiskDrive` |
           | SMB | `Win32_PerfRawData_PerfNet_Server`, `Win32_PerfRawData_Counters_SMBServerShares` |
           | Time synchronization | `Win32_PerfRawData_MicrosoftWindowsW32TimePerf_WindowsTimeService` |
+          | Node identity | `Win32_ComputerSystemProduct` |
           | Node labels | `Win32_OperatingSystem`, `Win32_ComputerSystem`, `Win32_Processor`, `Win32_PhysicalMemory`, `Win32_LogicalDiskToPartition`, `Win32_IP4RouteTable`, `Win32_NetworkAdapter`, `Win32_NetworkAdapterConfiguration` |
       supported_platforms:
         include: [Linux, Windows]
@@ -106,6 +107,9 @@ modules:
             - With NTLMv2, every collection logs in again; with Kerberos, the job logs in when it needs a new ticket, which is every collection while the login fails. With a wrong or expired password, each collection then adds one failed logon (and each `autodetection_retry` attempt while the job is starting), which can lock the account under an account lockout policy.
             - A Kerberos job keeps using its ticket until the ticket expires (after 10 hours by default in Active Directory), the job restarts, or a collection reaches the host but cannot open its WMI session. Disabling the account, changing its password or changing its group memberships takes effect on the host only then.
             - Kerberos needs an account of the host's own domain: the poller does not follow referrals to other domains of the forest.
+            - Two jobs that monitor the same host, for example one by IP address and one by DNS name, share its node, so each of its charts appears twice. Define one job per host.
+            - Machines that report the same system UUID, such as virtual machines copied together with their UUID, share one node. Give each virtual machine its own UUID in the hypervisor, or set `vnode` on their jobs.
+            - A job whose address moves between machines, such as a failover cluster's name, stops collecting after a move when the machines report system UUIDs, because the address then reaches another machine. Set `vnode` to monitor such an address.
             - A WinRM listener with `CbtHardeningLevel` set to `Strict` rejects the plugin, because it sends no TLS channel binding token.
             - Rates, such as traffic, packets and errors, appear from the second collection after a job starts, because a rate needs two readings.
             - When a host restarts, counters that Windows keeps in 32 bits, such as context switches, start again from zero. If such a counter was close to its 32-bit maximum before the restart, the Agent reads the drop as a counter wrap and its chart shows one spike.
@@ -126,7 +130,7 @@ modules:
           description: |
             The poller's own cost is small: a few short-lived connections per job per collection.
 
-            On each Windows host, every collection costs up to eighteen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. With Kerberos, each job also sends three requests to a domain controller whenever it needs a new ticket: about every ten hours with Active Directory's default ticket lifetime, after a collection that reached the host could not open its WMI session, and in every collection while the login fails. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
+            On each Windows host, every collection costs up to nineteen WMI queries, one more while it reads the model of a physical disk that appeared, run by the WMI provider host process (`WmiPrvSE.exe`), and three ICMP echo requests. DCOM opens two authenticated TCP connections per collection (the RPC endpoint mapper and the WMI service); WinRM opens one authenticated HTTPS connection. With Kerberos, each job also sends three requests to a domain controller whenever it needs a new ticket: about every ten hours with Active Directory's default ticket lifetime, after a collection that reached the host could not open its WMI session, and in every collection while the login fails. Every five minutes the node labels add up to eight small queries. To reduce the load, raise `update_every` or switch off the metric groups you do not need under `collectors`.
     setup:
       prerequisites:
         list:
@@ -319,7 +323,7 @@ modules:
               required: false
               group: Virtual Node
               detailed_description: |
-                Leave `vnode` empty and the job creates a node for the Windows host. Its identity comes from `host`: renaming the Windows computer keeps the node and its history, while changing `host` creates a new node. The node is named after the Windows computer name, carries `host` in the `address` label, and gets these labels from WMI, refreshed every five minutes. A label is left out when Windows does not report its value unambiguously.
+                Leave `vnode` empty and the job creates a node for the Windows host. Its identity is the host's SMBIOS system UUID, read when the job starts, so the node keeps its history when the host's address changes, when `host` changes from an IP address to a DNS name, and when the Windows computer is renamed. A host that reports no usable UUID (empty, all zeros, all F's or a firmware placeholder) is identified by `host` instead, and changing `host` then creates a new node. The node is named after the Windows computer name, carries `host` in the `address` label, and gets these labels from WMI, refreshed every five minutes. A label is left out when Windows does not report its value unambiguously.
 
                 | Labels | Meaning |
                 |---|---|
@@ -330,9 +334,9 @@ modules:
                 | `_system_disk_space` | Total partition size of the fixed drives, in bytes; requires the disk group |
                 | `_net_default_iface`, `_net_default_iface_ip`, `_net_default_iface_detection` | Interface and IPv4 address of the default route |
 
-                The generated node turns Stale after about three missed collections, as the Overview describes.
+                The generated node turns Stale after about three missed collections, as the Overview describes. It turns Stale too when the address reaches a machine with a different system UUID: the job then stops collecting until the original machine answers again, and restarting the job gives that machine a node of its own (see Troubleshooting). A host identified by `host`, or machines that share a UUID, get no such protection.
 
-                Set `vnode` to the name of a virtual node defined in `vnodes.conf` to use its name and labels instead; the job then reads no system information. Give that node the label `_os: windows`, which the generated node has, so the stock Windows alerts apply to it. Such a node turns Stale only after its own `stale_after` time (or `_node_stale_after_seconds` label); without one it stays live, with gaps in its charts, while the host is down.
+                Set `vnode` to the name of a virtual node defined in `vnodes.conf` to use its name and labels instead; the job then reads neither the host's system UUID nor its system information, and collects from whichever machine answers at `host`. Use it for an address that moves between machines, such as a failover cluster's name, and for machines that share a system UUID. Give that node the label `_os: windows`, which the generated node has, so the stock Windows alerts apply to it. Such a node turns Stale only after its own `stale_after` time (or `_node_stale_after_seconds` label); without one it stays live, with gaps in its charts, while the host is down.
         examples:
           folding:
             title: Configuration example
@@ -412,7 +416,7 @@ modules:
             fix: 'Remove `transport` to use DCOM, or set `auth: ntlm` to keep WinRM.'
           - error: 'auth kerberos requires host to be the Windows host''s DNS name, not an IP address'
             cause: '`host` is an IP address. Active Directory issues Kerberos tickets for host names, not addresses.'
-            fix: Set `host` to the host's DNS name, such as `fileserver.ad.example.com`. The job then creates a new node, because the node's identity comes from `host`.
+            fix: Set `host` to the host's DNS name, such as `fileserver.ad.example.com`. The job keeps its node when the host reports a system UUID, which then identifies the node.
           - error: 'auth kerberos requires username as user@domain, with the Active Directory DNS domain'
             cause: '`username` is a `DOMAIN\user` or local account name, or its domain part is not a DNS name.'
             fix: Write the account as its logon name and the domain's DNS name, such as `monitor@ad.example.com`.
@@ -578,6 +582,22 @@ modules:
               ```text
               chart labels: host=!fileserver.example.com *
               ```
+          - error: 'system UUID WMI query failed: `reason`'
+            when: The job starts. In later collections the same message is a warning, and the collection continues.
+            cause: 'The host refused or failed the query of `Win32_ComputerSystemProduct`, whose UUID identifies the host''s node, so the job does not start. With WinRM, a refused query ends in `WinRM returned a WS-Management fault`.'
+            fix: 'Grant the account the WMI permissions described under Prerequisites, and check that the class answers on the host with `Get-CimInstance Win32_ComputerSystemProduct | Select-Object UUID`. Set `autodetection_retry` so that a job whose host fails the query only briefly starts later.'
+          - error: 'system UUID WMI query did not return one instance'
+            cause: 'The host''s WMI returned no `Win32_ComputerSystemProduct` instance, or more than one, so the job cannot tell which machine it reached and does not start.'
+            fix: 'Check the class on the host with `Get-CimInstance Win32_ComputerSystemProduct`. When it returns nothing, check the WMI repository with `winmgmt /verifyrepository`.'
+          - error: 'host system UUID differs from the one read when the job started'
+            cause: 'The address reaches another machine than when the job started: it was reassigned, a failover cluster''s name moved to another node, or the host''s firmware or motherboard was replaced. The job publishes nothing, so the node turns Stale.'
+            fix: 'To monitor the machine now at the address, restart the job or the Agent: that machine gets a node of its own, and the old node keeps its history. Collection resumes by itself when the original machine answers at the address again. For an address that moves between machines on purpose, set `vnode`.'
+          - error: 'host reports no usable system UUID: its node is identified by the configured host'
+            cause: 'A warning when the job starts: the host''s firmware reports no UUID that identifies it (empty, all zeros, all F''s or a known placeholder). The job collects normally, but its node follows `host` instead of the machine.'
+            fix: 'For a virtual machine, give it a unique UUID in the hypervisor''s settings and restart the job; the host then gets a new node. Otherwise keep `host` unchanged, because changing it creates a new node.'
+          - error: 'conflicting vnode metadata for guid `"guid"`'
+            cause: 'Two jobs publish the same node with different addresses or names. They monitor the same machine, for example one by IP address and one by DNS name, or two machines report the same system UUID, such as copies of one virtual machine.'
+            fix: 'Keep one job per machine. For different machines that share a system UUID, give each virtual machine its own UUID in the hypervisor, or set `vnode` on their jobs.'
           - error: 'The host''s node is Stale and the `wmi_host_last_collected_secs` alert is critical'
             cause: The poller has missed two to three collections in a row from the host. The host is down or unreachable, or it rejects the login. The job logs the reason with every failed collection, as one of the errors above.
             fix: Fix the cause the job logs. With the next successful collection the node turns live again and the alert clears; the alert's recovery notification is delayed by at least 5 minutes.

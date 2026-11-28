@@ -270,27 +270,6 @@ func TestCollector_DCOMAuthenticator(t *testing.T) {
 	krb.Cleanup(t.Context())
 }
 
-func TestCollector_GeneratedVnodeIdentity(t *testing.T) {
-	var expectedGUID string
-	for i, host := range []string{"windows.example.com", " Windows.Example.com. "} {
-		c := configuredCollector()
-		c.Host = host
-		if i == 1 {
-			c.Transport = "winrm"
-		}
-		require.NoError(t, c.Init(t.Context()))
-		vnode := c.VirtualNode()
-		require.NotNil(t, vnode)
-		if expectedGUID == "" {
-			expectedGUID = vnode.GUID
-			require.NotEmpty(t, expectedGUID)
-		}
-		assert.Equal(t, expectedGUID, vnode.GUID)
-		assert.Equal(t, "windows.example.com", vnode.Hostname)
-		assert.Equal(t, map[string]string{"_vnode_type": "wmi", "_os": "windows", "address": c.Host}, vnode.Labels)
-	}
-}
-
 func TestConfigSchemaAndMetadata(t *testing.T) {
 	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml",
 		collecttest.ConfigSchemaCheck{

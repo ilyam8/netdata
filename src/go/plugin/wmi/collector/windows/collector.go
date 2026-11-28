@@ -47,9 +47,13 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	store         metrix.CollectorStore
-	metrics       collectorMetrics
+	store   metrix.CollectorStore
+	metrics collectorMetrics
+	// vnode is the generated node, created by a successful startup check from
+	// systemUUID, the host's SMBIOS system UUID it read ("" when the host reports
+	// none usable). Both stay unset for a job with a configured vnode.
 	vnode         *vnodes.VirtualNode
+	systemUUID    string
 	nextInventory time.Time
 	lastCPU       cpuSample
 	// lastDisks holds each physical disk's sample of the previous poll, by
@@ -121,23 +125,32 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 		c.winrmTLS = cfg
 	}
-	if err := c.initPinger(); err != nil {
-		return err
-	}
-	c.vnode = newVirtualNode(c.Host, nodeStaleAfter(c.UpdateEvery, c.Timeout.Duration()))
-	return nil
+	return c.initPinger()
 }
 
+// Check polls the enabled metric groups, without the inventory, and reads the
+// host's system UUID, which fixes the generated node's identity for the life of
+// the job.
 func (c *Collector) Check(ctx context.Context) error {
-	// Readiness depends only on the enabled metric groups.
-	_, err := c.poll(ctx, false)
-	return err
+	if _, err := c.poll(ctx, false); err != nil {
+		return err
+	}
+	if c.Vnode != "" {
+		return nil
+	}
+	if c.systemUUID == "" {
+		// Logged as public text, which the Agent keeps for jobs with secret references.
+		c.Warning(publicError("host reports no usable system UUID: its node is identified by the configured host"))
+	}
+	c.vnode = newVirtualNode(c.systemUUID, c.Host, nodeStaleAfter(c.UpdateEvery, c.Timeout.Duration()))
+	return nil
 }
 
 // Collect pings the host alongside the WMI poll. A failed poll fails the
 // collection, so the job never publishes ping alone.
 func (c *Collector) Collect(ctx context.Context) error {
-	inventoryDue := c.Vnode == "" && !time.Now().Before(c.nextInventory)
+	// Only a generated node carries the host's inventory.
+	inventoryDue := c.vnode != nil && !time.Now().Before(c.nextInventory)
 	waitPing := c.startPing(ctx)
 	snapshot, err := c.poll(ctx, inventoryDue)
 	ping, pinged := waitPing(err != nil)

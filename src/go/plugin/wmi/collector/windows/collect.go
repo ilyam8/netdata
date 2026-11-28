@@ -28,9 +28,11 @@ type metricGroup struct {
 	read  func([]map[string]any) bool
 }
 
-// poll opens one session, queries every enabled metric group and, when due,
-// refreshes the host inventory in the same session. It fails only when no
-// enabled group produced observations; failed groups are logged and leave gaps.
+// poll opens one session, identifies the host for a generated node, queries
+// every enabled metric group and, when due, refreshes the host inventory in the
+// same session. It fails when the host is not the one the node belongs to, or
+// when no enabled group produced observations; failed groups are logged and
+// leave gaps.
 func (c *Collector) poll(parent context.Context, inventoryDue bool) (observations, error) {
 	ctx, cancel := context.WithTimeout(parent, c.Timeout.Duration())
 	defer cancel()
@@ -48,6 +50,14 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		return observations{}, safeTransportError("failed to open WMI session", err)
 	}
 	defer session.Close()
+
+	// reached: a query got an answer from the host.
+	var reached bool
+	if c.Vnode == "" {
+		if reached, err = c.identify(parent, ctx, session); err != nil {
+			return observations{}, err
+		}
+	}
 
 	var snapshot observations
 	// The fixed-drive rows also feed the inventory's disk capacity label, so a
@@ -143,9 +153,9 @@ func (c *Collector) poll(parent context.Context, inventoryDue bool) (observation
 		},
 	}
 
-	// reached: a query got an answer from the host. sessionLost: the session
-	// failed, so later queries and the inventory would fail the same way.
-	var succeeded, reached, sessionLost bool
+	// sessionLost: the session failed, so later queries and the inventory would
+	// fail the same way.
+	var succeeded, sessionLost bool
 	var failures [len(groups)]error
 	for i, group := range groups {
 		if !group.enabled || (group.needs != nil && !group.needs()) {
