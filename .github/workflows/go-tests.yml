@@ -15,8 +15,12 @@ jobs:
   file-check: # Check what files changed if we’re being run in a PR or on a push.
     name: Check Modified Files
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
     outputs:
-      run: ${{ steps.check-run.outputs.run }}
+      run: ${{ steps.check-run.outputs.run == 'true' && steps.reuse.outputs.run_id == '' }}
     steps:
       - name: Checkout
         id: checkout
@@ -51,6 +55,8 @@ jobs:
             **/CMakeLists.txt
             .github/workflows/go-tests.yml
             .github/scripts/get-go-version.py
+            .github/scripts/go-pr-result.py
+            .github/scripts/test-go-pr-result.py
             .github/scripts/normalize-go-test-json.py
             .github/scripts/summarize-go-test-json.py
             .github/scripts/test-go-test-timings.py
@@ -87,6 +93,14 @@ jobs:
             echo 'run=false' >> "${GITHUB_OUTPUT}"
           fi
 
+      - name: Check for completed Go validation on the landed tree
+        id: reuse
+        if: github.event_name == 'push' && steps.push-range.outputs.known == 'true' && steps.check-run.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: python3 .github/scripts/go-pr-result.py
+
   matrix:
     name: Generate Build Matrix
     runs-on: ubuntu-latest
@@ -94,10 +108,13 @@ jobs:
       matrix: ${{ steps.get-version.outputs.matrix }}
       build_matrix: ${{ steps.get-version.outputs.build_matrix }}
     steps:
-      - name: Checkout
+      - name: >-
+          ${{ github.event_name == 'pull_request' && format('Checkout PR #{0} merge {1}', github.event.number, github.sha) || 'Checkout' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test Go build matrix
         run: python3 .github/scripts/test-go-build-matrix.py
+      - name: Test Go validation reuse
+        run: python3 .github/scripts/test-go-pr-result.py
       - name: Test Go test timing reports
         run: python3 .github/scripts/test-go-test-timings.py
       - name: Get Go version and modules
