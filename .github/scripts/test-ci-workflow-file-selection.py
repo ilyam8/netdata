@@ -35,6 +35,13 @@ BROAD_GO_PATH_PATTERNS = (
 )
 
 
+def isolated_git_env() -> dict[str, str]:
+    # A hook can export the caller's repository or index even when cwd points at a fixture.
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    return env
+
+
 def shell_trigger_matches(path: str) -> bool:
     return SHELL_PATH_RE.search(path) is not None
 
@@ -153,17 +160,18 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
 
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp)
+            git_env = isolated_git_env()
 
             def git(*args):
                 return subprocess.check_output(
                     ["git", "-c", "user.name=CI", "-c", "user.email=ci@example.invalid",
-                     *args], cwd=repo, text=True,
+                     *args], cwd=repo, env=git_env, text=True,
                 ).strip()
 
             def selected(base, head, always="false"):
                 output = repo / ".git" / "outputs"
                 output.write_text("")
-                env = dict(os.environ, BASE_SHA=base, HEAD_SHA=head, ALWAYS=always,
+                env = dict(git_env, BASE_SHA=base, HEAD_SHA=head, ALWAYS=always,
                            GITHUB_OUTPUT=str(output))
                 subprocess.run(["bash", "-eo", "pipefail", "-c", script], cwd=repo,
                                env=env, check=True, capture_output=True)
