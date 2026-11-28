@@ -1689,3 +1689,5 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | Integration | Description |
 |-------------|-------------|
 | [Syslog from Network Devices](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp/npm-catalog/integrations/syslog_from_network_devices.md) | Ingest syslog from routers, switches, and firewalls into Netdata. |
+
+<!-- Generated documentation selection pilot. -->
