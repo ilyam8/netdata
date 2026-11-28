@@ -2,6 +2,7 @@
 
 import fnmatch
 import json
+import os
 import re
 import shlex
 import shutil
@@ -32,6 +33,13 @@ BROAD_GO_PATH_PATTERNS = (
     "**/go.mod",
     "**/go.sum",
 )
+
+
+def isolated_git_env() -> dict[str, str]:
+    # A hook can export the caller's repository or index even when cwd points at a fixture.
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    return env
 
 
 def shell_trigger_matches(path: str) -> bool:
@@ -143,6 +151,66 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
                         result = subprocess.run(["grep", "-Eq", match.group(1)], input=path + "\n",
                                                 text=True, capture_output=True)
                         self.assertEqual(result.returncode, expected, result.stderr)
+
+    def test_codeql_cpp_uses_cumulative_native_inputs(self) -> None:
+        workflow = CODEQL_WORKFLOW.read_text()
+        lines = workflow_step(workflow, "Check for C/C++ changes")
+        start = next(i for i, line in enumerate(lines) if line.strip() == "run: |")
+        script = textwrap.dedent("\n".join(lines[start + 1:]))
+
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            git_env = isolated_git_env()
+
+            def git(*args):
+                return subprocess.check_output(
+                    ["git", "-c", "user.name=CI", "-c", "user.email=ci@example.invalid",
+                     *args], cwd=repo, env=git_env, text=True,
+                ).strip()
+
+            def selected(base, head, always="false"):
+                output = repo / ".git" / "outputs"
+                output.write_text("")
+                env = dict(git_env, BASE_SHA=base, HEAD_SHA=head, ALWAYS=always,
+                           GITHUB_OUTPUT=str(output))
+                subprocess.run(["bash", "-eo", "pipefail", "-c", script], cwd=repo,
+                               env=env, check=True, capture_output=True)
+                return output.read_text().strip()
+
+            git("init", "-q")
+            git("commit", "--allow-empty", "-qm", "base")
+            base = git("rev-parse", "HEAD")
+            alert = repo / "ram.conf"
+            alert.write_text("alert fixture\n")
+            (repo / "example.c.md").write_text("documentation\n")
+            git("add", "--", "ram.conf", "example.c.md")
+            git("commit", "-qm", "alerts and docs")
+            docs = git("rev-parse", "HEAD")
+            self.assertEqual(selected(base, docs), "run=false")
+            self.assertEqual(selected(base, docs, always="true"), "run=true")
+            for missing_base, missing_head in (("", docs), (base, ""), ("", ""), ("missing-base", docs)):
+                with self.subTest(base=missing_base, head=missing_head):
+                    self.assertEqual(selected(missing_base, missing_head), "run=true")
+            # Each input should independently activate the query suite.
+            for path in ("src/libnetdata/aral/aral.c", "src/a.cc", "src/a.h", "src/a.cpp", "src/a.hxx", "src/a.c++",
+                         "src/deep/CMakeLists.txt", "packaging/cmake/config.cmake.h.in",
+                         ".github/codeql/c-cpp-config.yml",
+                         "src/exporting/prometheus/remote_write/remote_write.proto"):
+                with self.subTest(path=path):
+                    before = git("rev-parse", "HEAD")
+                    f = repo / path
+                    f.parent.mkdir(exist_ok=True, parents=True)
+                    f.write_text("input\n")
+                    git("add", "--", path)
+                    git("commit", "-qm", "add input")
+                    self.assertEqual(selected(before, "HEAD"), "run=true")
+            (repo / "README.md").write_text("follow-up\n")
+            git("add", "--", "README.md")
+            git("commit", "-qm", "docs follow-up")
+            self.assertEqual(selected(base, "HEAD"), "run=true")
+            git("mv", "src/a.cc", "src/moved.md")
+            git("commit", "-qm", "move source")
+            self.assertEqual(selected("HEAD^", "HEAD"), "run=true")
 
     def test_public_skill_changes_trigger_sow_workflow(self) -> None:
         workflow = SOW_WORKFLOW.read_text(encoding="utf-8")

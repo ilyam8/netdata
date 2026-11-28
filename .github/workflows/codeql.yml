@@ -44,17 +44,25 @@ jobs:
           fi
       - name: Check for C/C++ changes
         id: cpp
+        env:
+          ALWAYS: ${{ steps.always.outputs.run }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ "${{ steps.always.outputs.run }}" = "false" ]; then
-            if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.[ch](xx|\+\+)?' ; then
-              echo "run=true" >> "${GITHUB_OUTPUT}"
-              echo '::notice::C/C++ code has changed, need to run CodeQL.'
-            else
-              echo "run=false" >> "${GITHUB_OUTPUT}"
-            fi
-          else
-            echo "run=true" >> "${GITHUB_OUTPUT}"
+          # Only a successful, empty diff can skip the scan. Keep deletions and both sides of moves.
+          run=true
+          if [ "$ALWAYS" = false ] && [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             git diff --quiet --no-renames --ignore-submodules=none "$BASE_SHA...$HEAD_SHA" -- \
+              ':(icase)*.[ch]' ':(icase)*.cc' ':(icase)*.hh' ':(icase)*.[ch]pp' ':(icase)*.[ch]xx' ':(icase)*.[ch]++' \
+              '*.inl' '*.ipp' '*.[ch].in' '*.cmake' '*.cmake.in' CMakeLists.txt '*/CMakeLists.txt' \
+              '.github/codeql/c-cpp-config.yml' '.github/workflows/codeql.yml' .gitmodules \
+              src/aclk/aclk-schemas src/collectors/debugfs.plugin/libsensors/vendored \
+              'src/exporting/prometheus/remote_write/*.proto' netdata-installer.sh \
+              packaging/installer/install-required-packages.sh packaging/installer/functions.sh \
+              packaging/check-for-go-toolchain.sh packaging/installer/netdata-dem-pair.sh; then
+            run=false
           fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
       - name: Check for python changes
         id: python
         run: |
