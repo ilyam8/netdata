@@ -454,6 +454,7 @@ jobs:
       - prepare-dem-stock
     if: >-
       !cancelled() && needs.matrix.result == 'success' &&
+      (github.event_name != 'pull_request' || needs.file-check.outputs.run == 'true') &&
       (needs.file-check.outputs.dem != 'true' ||
         (needs.prepare-dem-inputs.result == 'success' && needs.prepare-dem-stock.result == 'success'))
     runs-on: ${{ matrix.runner }}
