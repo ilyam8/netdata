@@ -120,6 +120,31 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.strip(), expected)
 
+    def test_codeql_go_and_rust_source_selection(self) -> None:
+        workflow = CODEQL_WORKFLOW.read_text(encoding="utf-8")
+        cases = {
+            "Go": (
+                ("src/go/main.go", "src/go/plugin/ipmi/collector/ipmi/config.go",
+                 "src/go/go.mod", "src/go/go.sum"),
+                ("src/go/README.md", "src/go/plugin/example.go.md", "docs/src/go/main.go", "src/crates/main.rs"),
+            ),
+            "Rust": (
+                ("src/crates/main.rs", "src/crates/netflow-plugin/src/main.rs",
+                 "src/crates/Cargo.toml", "src/crates/Cargo.lock", "src/crates/netflow-plugin/Cargo.toml"),
+                ("src/crates/README.md", "src/crates/main.rs.md", "docs/src/crates/main.rs", "src/go/main.go"),
+            ),
+        }
+        for language, (accepted, rejected) in cases.items():
+            step = "\n".join(workflow_step(workflow, f"Check for {language} changes"))
+            match = re.search(r"grep -Eq '([^']+)'", step)
+            self.assertIsNotNone(match)
+            for paths, expected in ((accepted, 0), (rejected, 1)):
+                for path in paths:
+                    with self.subTest(language=language, path=path):
+                        result = subprocess.run(["grep", "-Eq", match.group(1)], input=path + "\n",
+                                                text=True, capture_output=True)
+                        self.assertEqual(result.returncode, expected, result.stderr)
+
     def test_codeql_cpp_uses_cumulative_native_inputs(self) -> None:
         workflow = CODEQL_WORKFLOW.read_text()
         lines = workflow_step(workflow, "Check for C/C++ changes")
@@ -159,7 +184,7 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
                 with self.subTest(base=missing_base, head=missing_head):
                     self.assertEqual(selected(missing_base, missing_head), "run=true")
             # Each input should independently activate the query suite.
-            for path in ("src/a.cc", "src/a.h", "src/a.cpp", "src/a.hxx", "src/a.c++",
+            for path in ("src/libnetdata/aral/aral.c", "src/a.cc", "src/a.h", "src/a.cpp", "src/a.hxx", "src/a.c++",
                          "src/deep/CMakeLists.txt", "packaging/cmake/config.cmake.h.in",
                          ".github/codeql/c-cpp-config.yml",
                          "src/exporting/prometheus/remote_write/remote_write.proto"):
@@ -178,31 +203,6 @@ new AsyncFunction('github', 'context', input.script)(github, context).then(conso
             git("mv", "src/a.cc", "src/moved.md")
             git("commit", "-qm", "move source")
             self.assertEqual(selected("HEAD^", "HEAD"), "run=true")
-
-    def test_codeql_go_and_rust_source_selection(self) -> None:
-        workflow = CODEQL_WORKFLOW.read_text(encoding="utf-8")
-        cases = {
-            "Go": (
-                ("src/go/main.go", "src/go/plugin/ipmi/collector/ipmi/config.go",
-                 "src/go/go.mod", "src/go/go.sum"),
-                ("src/go/README.md", "src/go/plugin/example.go.md", "docs/src/go/main.go", "src/crates/main.rs"),
-            ),
-            "Rust": (
-                ("src/crates/main.rs", "src/crates/netflow-plugin/src/main.rs",
-                 "src/crates/Cargo.toml", "src/crates/Cargo.lock", "src/crates/netflow-plugin/Cargo.toml"),
-                ("src/crates/README.md", "src/crates/main.rs.md", "docs/src/crates/main.rs", "src/go/main.go"),
-            ),
-        }
-        for language, (accepted, rejected) in cases.items():
-            step = "\n".join(workflow_step(workflow, f"Check for {language} changes"))
-            match = re.search(r"grep -Eq '([^']+)'", step)
-            self.assertIsNotNone(match)
-            for paths, expected in ((accepted, 0), (rejected, 1)):
-                for path in paths:
-                    with self.subTest(language=language, path=path):
-                        result = subprocess.run(["grep", "-Eq", match.group(1)], input=path + "\n",
-                                                text=True, capture_output=True)
-                        self.assertEqual(result.returncode, expected, result.stderr)
 
     def test_public_skill_changes_trigger_sow_workflow(self) -> None:
         workflow = SOW_WORKFLOW.read_text(encoding="utf-8")
