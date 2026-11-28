@@ -22,6 +22,8 @@ modules:
         metrics_description: |
           This module measures round-trip time and packet loss by sending ping messages to network hosts.
 
+          For each host it also charts the round-trip time of every reply as a distribution heatmap, which keeps occasional latency spikes and multiple latency levels visible at any time range.
+
           There are two operational modes:
 
           - **Privileged** (send raw ICMP ping, default). Requires the necessary permissions ([CAP_NET_RAW](https://man7.org/linux/man-pages/man7/capabilities.7.html) on Linux, `setuid` bit on other systems).
@@ -204,6 +206,27 @@ modules:
                 - name: min
                 - name: max
                 - name: avg
+            - name: ping.host_rtt_distribution
+              description: Ping round-trip time distribution
+              unit: replies/s
+              chart_type: heatmap
+              dimensions:
+                - name: "0.1"
+                - name: "0.2"
+                - name: "0.5"
+                - name: "1"
+                - name: "2"
+                - name: "5"
+                - name: "10"
+                - name: "20"
+                - name: "50"
+                - name: "100"
+                - name: "200"
+                - name: "500"
+                - name: "1000"
+                - name: "2000"
+                - name: "5000"
+                - name: +Inf
             - name: ping.host_std_dev_rtt
               description: Ping round-trip time standard deviation
               unit: milliseconds

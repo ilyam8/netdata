@@ -11,6 +11,7 @@ groups:
       - mean_jitter
       - ewma_jitter
       - sma_jitter
+      - rtt_bucket
     charts:
       - id: host_rtt
         title: Ping round-trip time
@@ -32,6 +33,15 @@ groups:
             name: avg
             options:
               divisor: 1000
+      - title: Ping round-trip time distribution
+        context: host_rtt_distribution
+        units: replies/s
+        type: heatmap
+        instances:
+          by_labels: [host]
+        dimensions:
+          # One dimension per histogram bucket, named by its upper bound in milliseconds.
+          - selector: rtt_bucket
       - id: host_std_dev_rtt
         title: Ping round-trip time standard deviation
         context: host_std_dev_rtt

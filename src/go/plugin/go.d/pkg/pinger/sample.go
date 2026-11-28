@@ -12,6 +12,10 @@ type Sample struct {
 
 	PacketLossPct float64
 
+	// RTTs holds one round-trip time per first echo reply, in arrival order.
+	// Duplicate replies and replies after the probe timeout are not included.
+	RTTs []time.Duration
+
 	RTT    RTTSummary
 	Jitter JitterSummary
 }

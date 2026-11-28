@@ -10,43 +10,34 @@ import (
 )
 
 func (c *Collector) collect(ctx context.Context) error {
-	samples := c.collectSamples(ctx, true)
-	if len(samples) == 0 {
-		return nil
-	}
+	mx := c.metrics
 
-	vecMeter := c.store.Write().SnapshotMeter("").Vec("host")
-	minRTT := vecMeter.Gauge("min_rtt")
-	maxRTT := vecMeter.Gauge("max_rtt")
-	avgRTT := vecMeter.Gauge("avg_rtt")
-	stdDevRTT := vecMeter.Gauge("std_dev_rtt")
-	rttVariance := vecMeter.Gauge("rtt_variance")
-	meanJitter := vecMeter.Gauge("mean_jitter")
-	ewmaJitter := vecMeter.Gauge("ewma_jitter")
-	smaJitter := vecMeter.Gauge("sma_jitter")
-	packetLoss := vecMeter.Gauge("packet_loss")
-	packetsRecv := vecMeter.Gauge("packets_recv")
-	packetsSent := vecMeter.Gauge("packets_sent")
+	for _, sample := range c.collectSamples(ctx, true) {
+		host := sample.Host
 
-	for _, sample := range samples {
-		packetsRecv.WithLabelValues(sample.Host).Observe(float64(sample.PacketsRecv))
-		packetsSent.WithLabelValues(sample.Host).Observe(float64(sample.PacketsSent))
-		packetLoss.WithLabelValues(sample.Host).Observe(sample.PacketLossPct * 1000)
+		mx.packetsRecv.WithLabelValues(host).Observe(float64(sample.PacketsRecv))
+		mx.packetsSent.WithLabelValues(host).Observe(float64(sample.PacketsSent))
+		mx.packetLoss.WithLabelValues(host).Observe(sample.PacketLossPct * 1000)
 
 		if sample.RTT.Valid {
-			minRTT.WithLabelValues(sample.Host).Observe(float64(sample.RTT.Min.Microseconds()))
-			maxRTT.WithLabelValues(sample.Host).Observe(float64(sample.RTT.Max.Microseconds()))
-			avgRTT.WithLabelValues(sample.Host).Observe(float64(sample.RTT.Avg.Microseconds()))
-			stdDevRTT.WithLabelValues(sample.Host).Observe(float64(sample.RTT.StdDev.Microseconds()))
-			rttVariance.WithLabelValues(sample.Host).Observe(float64(sample.RTT.VarianceMicrosecondsSquared()))
+			mx.minRTT.WithLabelValues(host).Observe(float64(sample.RTT.Min.Microseconds()))
+			mx.maxRTT.WithLabelValues(host).Observe(float64(sample.RTT.Max.Microseconds()))
+			mx.avgRTT.WithLabelValues(host).Observe(float64(sample.RTT.Avg.Microseconds()))
+			mx.stdDevRTT.WithLabelValues(host).Observe(float64(sample.RTT.StdDev.Microseconds()))
+			mx.rttVariance.WithLabelValues(host).Observe(float64(sample.RTT.VarianceMicrosecondsSquared()))
+		}
+
+		// A host without replies is not observed, so its distribution chart gets a gap.
+		for _, rtt := range sample.RTTs {
+			mx.rtt.WithLabelValues(host).Observe(durationToMilliseconds(rtt))
 		}
 
 		if sample.Jitter.InstantValid {
-			meanJitter.WithLabelValues(sample.Host).Observe(float64(sample.Jitter.Mean.Microseconds()))
+			mx.meanJitter.WithLabelValues(host).Observe(float64(sample.Jitter.Mean.Microseconds()))
 		}
 		if sample.Jitter.SmoothedValid {
-			ewmaJitter.WithLabelValues(sample.Host).Observe(float64(sample.Jitter.EWMA.Microseconds()))
-			smaJitter.WithLabelValues(sample.Host).Observe(float64(sample.Jitter.SMA.Microseconds()))
+			mx.ewmaJitter.WithLabelValues(host).Observe(float64(sample.Jitter.EWMA.Microseconds()))
+			mx.smaJitter.WithLabelValues(host).Observe(float64(sample.Jitter.SMA.Microseconds()))
 		}
 	}
 

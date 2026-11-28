@@ -14,7 +14,11 @@ import (
 )
 
 func TestProbeError_Unwrap(t *testing.T) {
-	err := &ProbeError{Host: "host", Stage: "run", Err: syscall.EPERM}
+	err := &ProbeError{
+		Host:  "host",
+		Stage: "run",
+		Err:   syscall.EPERM,
+	}
 
 	var errno syscall.Errno
 	require.True(t, errors.As(err, &errno))

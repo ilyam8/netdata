@@ -35,51 +35,65 @@ func TestDefaultRunner_ResolveSelectsAddress(t *testing.T) {
 			wantAddr: "fe80::1%eth0",
 		},
 		"name on ip prefers ipv4": {
-			network:    "ip",
-			host:       "host.example",
-			resolver:   fakeResolver{addrs: testIPAddrs("2001:db8::1", "192.0.2.1", "192.0.2.2")},
+			network: "ip",
+			host:    "host.example",
+			resolver: fakeResolver{
+				addrs: testIPAddrs("2001:db8::1", "192.0.2.1", "192.0.2.2"),
+			},
 			wantLookup: "LookupIPAddr",
 			wantAddr:   "192.0.2.1",
 		},
 		"name on ip without ipv4 keeps the zone": {
-			network:    "ip",
-			host:       "host.example",
-			resolver:   fakeResolver{addrs: testIPAddrs("fe80::1%eth0", "2001:db8::1")},
+			network: "ip",
+			host:    "host.example",
+			resolver: fakeResolver{
+				addrs: testIPAddrs("fe80::1%eth0", "2001:db8::1"),
+			},
 			wantLookup: "LookupIPAddr",
 			wantAddr:   "fe80::1%eth0",
 		},
 		"name on ip6 skips ipv4 and keeps the zone": {
-			network:    "ip6",
-			host:       "host.example",
-			resolver:   fakeResolver{addrs: testIPAddrs("192.0.2.1", "fe80::1%eth0", "2001:db8::1")},
+			network: "ip6",
+			host:    "host.example",
+			resolver: fakeResolver{
+				addrs: testIPAddrs("192.0.2.1", "fe80::1%eth0", "2001:db8::1"),
+			},
 			wantLookup: "LookupIPAddr",
 			wantAddr:   "fe80::1%eth0",
 		},
 		"name on ip6 without ipv6": {
-			network:    "ip6",
-			host:       "host.example",
-			resolver:   fakeResolver{addrs: testIPAddrs("192.0.2.1")},
+			network: "ip6",
+			host:    "host.example",
+			resolver: fakeResolver{
+				addrs: testIPAddrs("192.0.2.1"),
+			},
 			wantLookup: "LookupIPAddr",
 			wantErr:    "address host.example: no suitable address found",
 		},
 		"name on ip4 queries ipv4 only": {
-			network:    "ip4",
-			host:       "host.example",
-			resolver:   fakeResolver{ips: []net.IP{net.ParseIP("192.0.2.2"), net.ParseIP("192.0.2.1")}},
+			network: "ip4",
+			host:    "host.example",
+			resolver: fakeResolver{
+				ips: []net.IP{net.ParseIP("192.0.2.2"), net.ParseIP("192.0.2.1")},
+			},
 			wantLookup: "LookupIP ip4",
 			wantAddr:   "192.0.2.2",
 		},
 		"unknown network resolves as ip": {
-			network:    "",
-			host:       "host.example",
-			resolver:   fakeResolver{addrs: testIPAddrs("192.0.2.1")},
+			network: "",
+			host:    "host.example",
+			resolver: fakeResolver{
+				addrs: testIPAddrs("192.0.2.1"),
+			},
 			wantLookup: "LookupIPAddr",
 			wantAddr:   "192.0.2.1",
 		},
 		"lookup error": {
-			network:    "ip",
-			host:       "host.example",
-			resolver:   fakeResolver{err: errors.New("lookup failed")},
+			network: "ip",
+			host:    "host.example",
+			resolver: fakeResolver{
+				err: errors.New("lookup failed"),
+			},
 			wantLookup: "LookupIPAddr",
 			wantErr:    "lookup failed",
 		},
@@ -88,7 +102,10 @@ func TestDefaultRunner_ResolveSelectsAddress(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			resolver := tc.resolver
-			r := &defaultRunner{log: logger.NewWithWriter(nil), resolver: &resolver}
+			r := &defaultRunner{
+				log:      logger.NewWithWriter(nil),
+				resolver: &resolver,
+			}
 
 			addr, err := r.resolve(context.Background(), time.Now().Add(time.Minute), tc.network, tc.host)
 
@@ -135,8 +152,13 @@ func TestDefaultRunner_ProbeBoundsNameResolution(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			resolver := &blockingResolver{answer: tc.answer}
-			r := &defaultRunner{log: logger.NewWithWriter(nil), resolver: resolver}
+			resolver := &blockingResolver{
+				answer: tc.answer,
+			}
+			r := &defaultRunner{
+				log:      logger.NewWithWriter(nil),
+				resolver: resolver,
+			}
 			cfg := testConfig().Probe
 			cfg.Timeout = tc.timeout
 
@@ -202,7 +224,10 @@ func testIPAddrs(addrs ...string) []net.IPAddr {
 	var res []net.IPAddr
 	for _, s := range addrs {
 		ip, zone, _ := strings.Cut(s, "%")
-		res = append(res, net.IPAddr{IP: net.ParseIP(ip), Zone: zone})
+		res = append(res, net.IPAddr{
+			IP:   net.ParseIP(ip),
+			Zone: zone,
+		})
 	}
 	return res
 }

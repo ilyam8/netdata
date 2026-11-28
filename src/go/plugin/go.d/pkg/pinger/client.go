@@ -63,10 +63,18 @@ func (c *client) probe(ctx context.Context, host string, track bool) (Sample, er
 		if errors.As(err, &probeErr) {
 			return Sample{}, err
 		}
-		return Sample{}, &ProbeError{Host: host, Stage: "probe", Err: err}
+		return Sample{}, &ProbeError{
+			Host:  host,
+			Stage: "probe",
+			Err:   err,
+		}
 	}
 	if stats == nil {
-		return Sample{}, &ProbeError{Host: host, Stage: "probe", Err: fmt.Errorf("nil probe statistics")}
+		return Sample{}, &ProbeError{
+			Host:  host,
+			Stage: "probe",
+			Err:   fmt.Errorf("nil probe statistics"),
+		}
 	}
 
 	return deriveSample(host, stats, track, c.state, c.cfg.Analysis), nil

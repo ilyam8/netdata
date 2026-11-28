@@ -9,17 +9,15 @@ import (
 )
 
 func deriveSample(host string, stats *probing.Statistics, track bool, states *stateStore, cfg AnalysisConfig) Sample {
-	sample := Sample{
+	return Sample{
 		Host:          host,
 		PacketsSent:   int64(stats.PacketsSent),
 		PacketsRecv:   int64(stats.PacketsRecv),
 		PacketLossPct: stats.PacketLoss,
+		RTTs:          stats.Rtts,
 		RTT:           deriveRTT(stats),
+		Jitter:        deriveJitter(host, stats, track, states, cfg),
 	}
-
-	sample.Jitter = deriveJitter(host, stats, track, states, cfg)
-
-	return sample
 }
 
 func deriveRTT(stats *probing.Statistics) RTTSummary {

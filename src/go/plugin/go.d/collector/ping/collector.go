@@ -52,6 +52,7 @@ func New() *Collector {
 
 		newPinger: pinger.New,
 		store:     store,
+		metrics:   newHostMetrics(store),
 	}
 }
 
@@ -70,7 +71,8 @@ type Collector struct {
 	client    pinger.Client
 	newPinger func(pinger.Config, *logger.Logger) (pinger.Client, error)
 
-	store metrix.CollectorStore
+	store   metrix.CollectorStore
+	metrics hostMetrics
 }
 
 func (c *Collector) Configuration() any {

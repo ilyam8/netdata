@@ -6,8 +6,64 @@ import (
 	"testing"
 	"time"
 
+	probing "github.com/prometheus-community/pro-bing"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestDeriveSample(t *testing.T) {
+	tests := map[string]struct {
+		stats *probing.Statistics
+		want  Sample
+	}{
+		"replies": {
+			stats: testStats("host"),
+			want: Sample{
+				Host:          "host",
+				PacketsSent:   5,
+				PacketsRecv:   5,
+				PacketLossPct: 0,
+				RTTs: []time.Duration{
+					10 * time.Millisecond,
+					12 * time.Millisecond,
+					15 * time.Millisecond,
+					18 * time.Millisecond,
+					20 * time.Millisecond,
+				},
+				RTT: RTTSummary{
+					Valid:  true,
+					Min:    10 * time.Millisecond,
+					Max:    20 * time.Millisecond,
+					Avg:    15 * time.Millisecond,
+					StdDev: 5 * time.Millisecond,
+				},
+				Jitter: JitterSummary{
+					InstantValid: true,
+					Mean:         2500 * time.Microsecond,
+				},
+			},
+		},
+		"no replies": {
+			stats: &probing.Statistics{
+				PacketsSent: 5,
+				PacketsRecv: 0,
+				PacketLoss:  100,
+			},
+			want: Sample{
+				Host:          "host",
+				PacketsSent:   5,
+				PacketsRecv:   0,
+				PacketLossPct: 100,
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := deriveSample("host", tc.stats, false, newStateStore(), AnalysisConfig{})
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
 
 func TestCalcMeanJitter(t *testing.T) {
 	tests := map[string]struct {

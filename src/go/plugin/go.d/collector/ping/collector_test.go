@@ -193,7 +193,9 @@ func TestCollector_Collect(t *testing.T) {
 			require.NoError(t, err)
 			cc.CommitCycleSuccess()
 
-			labels := metrix.Labels{"host": "192.0.2.1"}
+			labels := metrix.Labels{
+				"host": "192.0.2.1",
+			}
 			if !test.wantValues {
 				_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value("min_rtt", labels)
 				assert.False(t, ok)
@@ -229,6 +231,179 @@ func TestCollector_CollectUsesTrackingProbing(t *testing.T) {
 		assert.Equal(t, "probe_and_track", call.method)
 		assert.Equal(t, "collect", call.ctx.Value(ctxKey{}))
 	}
+}
+
+func TestCollector_CollectRTTDistribution(t *testing.T) {
+	const host = "192.0.2.1"
+
+	tests := map[string]struct {
+		cycles []probeResult
+		// wantBuckets holds the non-zero range bucket counts after the last cycle, keyed by
+		// upper bound; nil means the histogram was never written for the host.
+		wantBuckets map[string]float64
+		// wantObserved reports whether the last cycle observed the histogram; the chart
+		// gets a gap for a cycle that did not.
+		wantObserved bool
+	}{
+		"each reply counts in the bucket whose upper bound it does not exceed": {
+			cycles: []probeResult{
+				resultWithReplies(
+					50*time.Microsecond,
+					time.Millisecond,
+					1000100*time.Nanosecond,
+					15*time.Millisecond,
+					5*time.Second,
+					6*time.Second,
+				),
+			},
+			wantBuckets: map[string]float64{
+				"0.1":  1,
+				"1":    1,
+				"2":    1,
+				"20":   1,
+				"5000": 1,
+				"+Inf": 1,
+			},
+			wantObserved: true,
+		},
+		"counts accumulate across cycles": {
+			cycles: []probeResult{
+				resultWithReplies(15*time.Millisecond, 30*time.Millisecond),
+				resultWithReplies(15 * time.Millisecond),
+			},
+			wantBuckets: map[string]float64{
+				"20": 2,
+				"50": 1,
+			},
+			wantObserved: true,
+		},
+		"a cycle without replies is not observed and keeps the counts": {
+			cycles: []probeResult{
+				resultWithReplies(15 * time.Millisecond),
+				resultWithoutReplies(),
+			},
+			wantBuckets: map[string]float64{
+				"20": 1,
+			},
+			wantObserved: false,
+		},
+		"a failed probe is not observed and keeps the counts": {
+			cycles: []probeResult{
+				resultWithReplies(15 * time.Millisecond),
+				{err: errors.New("mock probe error")},
+			},
+			wantBuckets: map[string]float64{
+				"20": 1,
+			},
+			wantObserved: false,
+		},
+		"a host that never replied has no distribution": {
+			cycles: []probeResult{
+				resultWithoutReplies(),
+			},
+			wantBuckets: nil,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := &mockClient{
+				byHost: make(map[string]probeResult),
+			}
+			collr := New()
+			collr.UpdateEvery = 1
+			collr.Hosts = []string{host}
+			collr.newPinger = func(_ pinger.Config, _ *logger.Logger) (pinger.Client, error) {
+				return client, nil
+			}
+			require.NoError(t, collr.Init(context.Background()))
+			cc := mustCycleController(t, collr.MetricStore())
+
+			for _, res := range test.cycles {
+				client.setResult(host, res)
+				cc.BeginCycle()
+				require.NoError(t, collr.Collect(context.Background()))
+				require.NoError(t, cc.CommitCycleSuccess())
+			}
+
+			flat := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
+			assert.Equal(t, test.wantBuckets, nonZeroRTTBuckets(flat, host))
+
+			raw := collr.MetricStore().Read(metrix.ReadRaw())
+			meta, written := raw.SeriesMeta("rtt", metrix.Labels{
+				"host": host,
+			})
+			require.Equal(t, test.wantBuckets != nil, written)
+			if written {
+				observed := meta.LastSeenSuccessSeq == raw.CollectMeta().LastSuccessSeq
+				assert.Equal(t, test.wantObserved, observed)
+			}
+		})
+	}
+}
+
+func TestCollector_ChartCoverage(t *testing.T) {
+	collr, _ := casePingSuccess(t)
+	cc := mustCycleController(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
+}
+
+// The template cannot list the dimensions chartengine infers at runtime (histogram buckets),
+// so the documented dimensions of every chart are compared with the emitted ones.
+func TestCollector_MetadataDocumentsEmittedDimensions(t *testing.T) {
+	collr, _ := casePingSuccess(t)
+	cc := mustCycleController(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+	attempt, err := engine.PreparePlan(collr.MetricStore().Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	// The dimensions of the first chart instance of each context, in creation order.
+	emitted := make(map[string][]string)
+	firstChartID := make(map[string]string)
+	for _, action := range attempt.Plan().Actions {
+		dim, ok := action.(chartengine.CreateDimensionAction)
+		if !ok {
+			continue
+		}
+		ctxName := dim.ChartMeta.Context
+		if id, seen := firstChartID[ctxName]; seen && id != dim.ChartID {
+			continue
+		}
+		firstChartID[ctxName] = dim.ChartID
+		emitted[ctxName] = append(emitted[ctxName], dim.Name)
+	}
+
+	metadata, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	module, err := collecttest.DecodeMetadataModule(metadata, "")
+	require.NoError(t, err)
+	documented := make(map[string][]string)
+	for _, metric := range module.Metrics {
+		documented[metric.Name] = metric.Dimensions
+	}
+
+	assert.Equal(t, documented, emitted)
+}
+
+func TestCollector_ArtifactsAgree(t *testing.T) {
+	template := New().ChartTemplateYAML()
+	metadata, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	health, err := os.ReadFile("../../../../../health/health.d/ping.conf")
+	require.NoError(t, err)
+
+	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, template, nil)
+	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, template)
 }
 
 func TestCollector_ChartTemplateYAML(t *testing.T) {
@@ -298,6 +473,13 @@ func sampleForHost(host string) pinger.Sample {
 		PacketsSent:   5,
 		PacketsRecv:   5,
 		PacketLossPct: 0,
+		RTTs: []time.Duration{
+			10 * time.Millisecond,
+			12 * time.Millisecond,
+			15 * time.Millisecond,
+			18 * time.Millisecond,
+			20 * time.Millisecond,
+		},
 		RTT: pinger.RTTSummary{
 			Valid:  true,
 			Min:    10 * time.Millisecond,
@@ -313,6 +495,46 @@ func sampleForHost(host string) pinger.Sample {
 			SMA:           2500 * time.Microsecond,
 		},
 	}
+}
+
+func resultWithReplies(rtts ...time.Duration) probeResult {
+	return probeResult{
+		sample: pinger.Sample{
+			PacketsSent: int64(len(rtts)),
+			PacketsRecv: int64(len(rtts)),
+			RTTs:        rtts,
+			RTT: pinger.RTTSummary{
+				Valid: true,
+				Min:   slices.Min(rtts),
+				Max:   slices.Max(rtts),
+			},
+		},
+	}
+}
+
+func resultWithoutReplies() probeResult {
+	return probeResult{
+		sample: pinger.Sample{
+			PacketsSent:   5,
+			PacketLossPct: 100,
+		},
+	}
+}
+
+// nonZeroRTTBuckets returns the host's non-zero RTT range bucket counts by upper bound, or nil.
+func nonZeroRTTBuckets(r metrix.Reader, host string) map[string]float64 {
+	var buckets map[string]float64
+	r.ForEachByName("rtt_bucket", func(labels metrix.LabelView, v metrix.SampleValue) {
+		if h, _ := labels.Get("host"); h != host || v == 0 {
+			return
+		}
+		if buckets == nil {
+			buckets = make(map[string]float64)
+		}
+		le, _ := labels.Get("le")
+		buckets[le] = v
+	})
+	return buckets
 }
 
 func mustCycleController(t *testing.T, store metrix.CollectorStore) metrix.CycleController {
@@ -358,7 +580,11 @@ func (m *mockClient) recordedProbe(ctx context.Context, host, method string) (pi
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.calls = append(m.calls, probeCall{host: host, method: method, ctx: ctx})
+	m.calls = append(m.calls, probeCall{
+		host:   host,
+		method: method,
+		ctx:    ctx,
+	})
 
 	res, ok := m.byHost[host]
 	if !ok {
@@ -373,6 +599,12 @@ func (m *mockClient) recordedProbe(ctx context.Context, host, method string) (pi
 		sample.Host = host
 	}
 	return sample, nil
+}
+
+func (m *mockClient) setResult(host string, res probeResult) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.byHost[host] = res
 }
 
 func (m *mockClient) probeCalls() []probeCall {

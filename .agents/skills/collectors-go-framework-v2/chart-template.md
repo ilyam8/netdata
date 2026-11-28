@@ -106,6 +106,15 @@ a *leaf* is the innermost family that holds charts.
 - **Not a stateset.** A chart whose dimensions are separate gauges (one metric per severity, counting conditions)
   keeps explicit dimension names.
 
+## Histograms
+
+- **Scope.** A chart over a `metrix` histogram selects its flattened bucket series, so the group `metrics:` list names
+  `<name>_bucket`, not `<name>`; validation rejects the selector otherwise. `<name>_count` and `<name>_sum` stay
+  uncharted unless the template enables autogen.
+- **Type.** Declare `type: heatmap`. chartengine forces it at runtime (`./SKILL.md#metrics-and-charts`), but the
+  metadata cross-check compares `chart_type` with the template's type. Exemplar:
+  `src/go/plugin/go.d/collector/ping/charts.yaml`.
+
 ## Values
 
 - The float flag belongs on the instrument (`metrix.WithFloat` in `src/go/pkg/metrix/options.go`), decided where the
@@ -175,10 +184,12 @@ a *leaf* is the innermost family that holds charts.
   (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare metadata.yaml, health.d and the template with each other.
   The `...With` variants take `HealthAlertsCheck`, which narrows a shared health.d file by context prefix (and, for the
   metadata comparison, selects the module by `meta.id`). `AssertMetadataDocumentsChartTemplate` compares stateset
-  dimensions in declared order, not rendered order. `AssertHealthAlertsMatchMetadata` requires each alert's target,
-  unit and lookup dimensions to be documented, and the variables of `calc`, `warn` and `crit` to be documented
-  dimensions, built-ins, alert names, qualified references or, with `HealthAlertsCheck.ChartTemplate`, chart variables
-  the template declares on the alert's chart. Page alert tables are derived, not checked
+  dimensions in declared order, not rendered order, and skips dimensions named only at runtime (`name_from_label`,
+  histogram buckets, summary quantiles); compare those with the dimensions a plan of the live store creates
+  (exemplar: `src/go/plugin/go.d/collector/ping/collector_test.go`). `AssertHealthAlertsMatchMetadata` requires each
+  alert's target, unit and lookup dimensions to be documented, and the variables of `calc`, `warn` and `crit` to be
+  documented dimensions, built-ins, alert names, qualified references or, with `HealthAlertsCheck.ChartTemplate`, chart
+  variables the template declares on the alert's chart. Page alert tables are derived, not checked
   (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1).
 - **Never restate an artifact.** A test that names one of the template's own contexts, dimension lists or families, or
   pins an alert's thresholds, lookup, cadence or recipients, restates what the artifact said when it was written and

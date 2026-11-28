@@ -42,13 +42,21 @@ func (r *defaultRunner) probe(ctx context.Context, host string, cfg ProbeConfig)
 
 	ipAddr, err := r.resolve(ctx, deadline, cfg.Network, host)
 	if err != nil {
-		return nil, &ProbeError{Host: host, Stage: "resolve", Err: err}
+		return nil, &ProbeError{
+			Host:  host,
+			Stage: "resolve",
+			Err:   err,
+		}
 	}
 
 	// The echo exchange gets what resolution left of the probe timeout.
 	remaining := time.Until(deadline)
 	if remaining <= 0 {
-		return nil, &ProbeError{Host: host, Stage: "resolve", Err: context.DeadlineExceeded}
+		return nil, &ProbeError{
+			Host:  host,
+			Stage: "resolve",
+			Err:   context.DeadlineExceeded,
+		}
 	}
 
 	pr := probing.New(host)
@@ -67,7 +75,11 @@ func (r *defaultRunner) probe(ctx context.Context, host string, cfg ProbeConfig)
 
 	if err := pr.RunWithContext(ctx); err != nil {
 		runErr := fmt.Errorf("ip %q iface %q: %w", pr.IPAddr(), pr.InterfaceName, err)
-		return nil, &ProbeError{Host: host, Stage: "run", Err: runErr}
+		return nil, &ProbeError{
+			Host:  host,
+			Stage: "run",
+			Err:   runErr,
+		}
 	}
 
 	stats := pr.Statistics()
@@ -123,7 +135,9 @@ func (r *defaultRunner) lookup(ctx context.Context, network, host string) ([]net
 		}
 		addrs := make([]net.IPAddr, 0, len(ips))
 		for _, ip := range ips {
-			addrs = append(addrs, net.IPAddr{IP: ip})
+			addrs = append(addrs, net.IPAddr{
+				IP: ip,
+			})
 		}
 		return addrs, nil
 	}
@@ -137,7 +151,10 @@ func (r *defaultRunner) lookup(ctx context.Context, network, host string) ([]net
 		return len(a.IP) != net.IPv6len || a.IP.To4() != nil
 	})
 	if len(addrs) == 0 {
-		return nil, &net.AddrError{Err: "no suitable address found", Addr: host}
+		return nil, &net.AddrError{
+			Err:  "no suitable address found",
+			Addr: host,
+		}
 	}
 	return addrs, nil
 }
