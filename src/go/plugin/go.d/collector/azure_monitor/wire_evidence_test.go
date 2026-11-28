@@ -111,3 +111,5 @@ func testWireEvidenceBatch(names ...string) queryBatch {
 		Resources:      []resourceInfo{{ID: id, idKey: strings.ToLower(id), UID: "edge"}},
 	}
 }
+
+// This fixture exercises Go file selection on the fork.
