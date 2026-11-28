@@ -6,9 +6,11 @@ on:
     branches:
       - master
   pull_request: null # PR checks only validate the build and generate artifacts for testing.
-concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
-  group: go-test-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+concurrency:
+  # Pushes enter the group before file selection. Isolate each push attempt so
+  # a push that skips testing cannot cancel an earlier push's Go tests.
+  group: go-test-${{ github.ref }}-${{ github.event_name }}${{ github.event_name == 'push' && format('-{0}-{1}', github.run_id, github.run_attempt) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   file-check: # Check what files changed if we’re being run in a PR or on a push.
     name: Check Modified Files
@@ -22,8 +24,24 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      - name: Check push range
+        id: push-range
+        if: github.event_name == 'push'
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+          PUSH_FORCED: ${{ toJSON(github.event.forced) }}
+        run: |
+          # changed-files can fall back to HEAD^ when the event range is unavailable.
+          if [ "${PUSH_FORCED}" = 'false' ] && [ "${PUSH_BEFORE}" != "${PUSH_HEAD}" ] &&
+             git merge-base --is-ancestor -- "${PUSH_BEFORE}" "${PUSH_HEAD}" 2>/dev/null; then
+            echo 'known=true' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'The push range is unknown or non-fast-forward. Running Go tests.'
+          fi
       - name: Check files
         id: check-files
+        if: github.event_name != 'push' || steps.push-range.outputs.known == 'true'
         uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
@@ -58,8 +76,12 @@ jobs:
           done
       - name: Check Run
         id: check-run
+        env:
+          UNKNOWN_PUSH_RANGE: ${{ github.event_name == 'push' && steps.push-range.outputs.known != 'true' }}
         run: |
-          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${UNKNOWN_PUSH_RANGE}" == "true" ] ||
+             [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] ||
+             [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
