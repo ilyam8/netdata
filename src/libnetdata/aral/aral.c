@@ -24,7 +24,7 @@
 #define ARAL_MALLOC_USE_MMAP_ABOVE (16ULL * 1024)
 
 // do not allocate pages smaller than this
-#define ARAL_MIN_PAGE_SIZE (16ULL * 1024)
+#define ARAL_MIN_PAGE_SIZE (1ULL << 14)
 
 #define ARAL_PAGE_INCOMING_PARTITIONS 4 // up to 32 (32-bits bitmap)
 
