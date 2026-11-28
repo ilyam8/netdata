@@ -814,3 +814,5 @@ For Azure Government or Azure China clouds, set the `cloud` parameter:
 - Azure China (21Vianet): `cloud: china`
 
 Ensure the service principal is registered in the correct cloud tenant.
+
+<!-- This fixture exercises generated Markdown selection on the fork. -->
