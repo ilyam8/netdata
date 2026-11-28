@@ -6,6 +6,7 @@
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
+<!-- Build and Docker fork measurement. -->
 <h3 align="center">Full-stack observability: the AI SRE that learns your stack!</h3>
 <p align="center">
   <b>Metrics · Logs · Traces · Flows · Topology</b><br/>
