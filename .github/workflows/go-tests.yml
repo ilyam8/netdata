@@ -5,6 +5,7 @@ on:
   push: # Master branch checks only validate the build and generate artifacts for testing.
     branches:
       - master
+      - ci/pilot-go-master-coverage-20261128
   pull_request: null # PR checks only validate the build and generate artifacts for testing.
 concurrency:
   # Pushes enter the group before file selection. Isolate each push attempt so
