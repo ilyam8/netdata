@@ -55,7 +55,6 @@ def github_get(repo, path):
 
 
 def reusable_run(repo, branch, before, landed):
-
     if not all(SHA.fullmatch(ref) for ref in (before, landed)):
         return None
     parents = git("show", "-s", "--format=%P", landed).split()
@@ -78,7 +77,7 @@ def reusable_run(repo, branch, before, landed):
     result = github_get(repo, f"actions/workflows/go-tests.yml/runs?{query}")
     if result["total_count"] > len(result["workflow_runs"]):
         return None
-    runs = [r for r in result["workflow_runs"] if r["event"] == "pull_request" and r["path"] == WORKFLOW
+    runs = [r for r in result["workflow_runs"] if r["event"] == "pull_request" and r["path"].partition("@")[0] == WORKFLOW
             and r["head_sha"] == head and r["head_branch"] == pr["head"]["ref"]
             and r["head_repository"]["id"] == pr["head"]["repo"]["id"]]
     if len(runs) != 1:

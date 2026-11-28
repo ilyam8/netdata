@@ -20,7 +20,7 @@ jobs:
       actions: read
       pull-requests: read
     outputs:
-      run: ${{ steps.check-run.outputs.run == 'true' && steps.reuse.outputs.run_id == '' }}
+      run: ${{ steps.check-run.outputs.run == 'true' && (steps.reuse.outcome != 'success' || steps.reuse.outputs.run_id == '') }}
     steps:
       - name: Checkout
         id: checkout
@@ -95,6 +95,7 @@ jobs:
 
       - name: Check for completed Go validation on the landed tree
         id: reuse
+        continue-on-error: true
         if: github.event_name == 'push' && steps.push-range.outputs.known == 'true' && steps.check-run.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}

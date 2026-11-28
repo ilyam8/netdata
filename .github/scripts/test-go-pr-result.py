@@ -52,7 +52,7 @@ class GoResultTest(unittest.TestCase):
         pr = {"number": 8, "state": "closed", "merged_at": merged, "merge_commit_sha": landed,
               "base": {"ref": "master", "repo": {"full_name": "example/agent"}},
               "head": {"sha": head, "ref": "feature", "repo": {"id": 123}}}
-        run = {"id": 77, "path": reuse.WORKFLOW, "event": "pull_request", "head_sha": head, "head_branch": "feature",
+        run = {"id": 77, "path": reuse.WORKFLOW + "@refs/pull/8/merge", "event": "pull_request", "head_sha": head, "head_branch": "feature",
                "head_repository": {"id": 123}, "status": "completed", "conclusion": "success",
                "run_attempt": 1, "updated_at": finished}
         merge = {"parents": [{"sha": base}, {"sha": head}], "tree": {"sha": tree}}
@@ -73,6 +73,8 @@ class GoResultTest(unittest.TestCase):
                 return reuse.reusable_run("example/agent", "master", base, landed)
 
         self.assertEqual(find(), 77)
+        self.assertEqual(find(run_changes={"path": reuse.WORKFLOW}), 77)
+        self.assertIsNone(find(run_changes={"path": ".github/workflows/tests.yml@main"}))
         self.assertIsNone(find(prs=[]))
         self.assertIsNone(find(prs=[pr, pr]))
         for changes in ({"status": "in_progress"}, {"conclusion": "failure"}, {"run_attempt": 2},
